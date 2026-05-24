@@ -1,4 +1,4 @@
-import type { CustomerAvailabilitySlot } from '@/types/customerApi';
+import type { CustomerAvailabilitySlot, CustomerBooking } from '@/types/customerApi';
 import { create } from 'zustand';
 
 type BookingState = {
@@ -9,6 +9,8 @@ type BookingState = {
   selectedStaffName: string | null;
   selectedDate: string | null;
   selectedSlot: CustomerAvailabilitySlot | null;
+  notes: string;
+  lastCreatedBooking: CustomerBooking | null;
   setSalon: (id: string | number, name: string) => void;
   toggleService: (id: string | number) => void;
   clearServices: () => void;
@@ -16,6 +18,8 @@ type BookingState = {
   setDate: (date: string) => void;
   setSlot: (slot: CustomerAvailabilitySlot) => void;
   clearSlot: () => void;
+  setNotes: (notes: string) => void;
+  setLastCreatedBooking: (booking: CustomerBooking | null) => void;
   resetBooking: () => void;
 };
 
@@ -27,6 +31,8 @@ const initialState = {
   selectedStaffName: null,
   selectedDate: null,
   selectedSlot: null,
+  notes: '',
+  lastCreatedBooking: null as CustomerBooking | null,
 };
 
 export const useBookingStore = create<BookingState>((set, get) => ({
@@ -46,6 +52,8 @@ export const useBookingStore = create<BookingState>((set, get) => ({
             selectedStaffName: null,
             selectedDate: null,
             selectedSlot: null,
+            notes: '',
+            lastCreatedBooking: null,
           }),
     });
   },
@@ -78,5 +86,7 @@ export const useBookingStore = create<BookingState>((set, get) => ({
     }),
   setSlot: (slot) => set({ selectedSlot: slot }),
   clearSlot: () => set({ selectedSlot: null }),
+  setNotes: (notes) => set({ notes }),
+  setLastCreatedBooking: (booking) => set({ lastCreatedBooking: booking }),
   resetBooking: () => set(initialState),
 }));

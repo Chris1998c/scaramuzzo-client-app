@@ -277,7 +277,7 @@ export default function BookStep2Screen() {
             pressed && selectedSlot && styles.buttonPressed,
           ]}
           disabled={!selectedSlot}
-          onPress={() => {}}>
+          onPress={() => router.push('/book-confirm')}>
           <Text style={styles.buttonText}>Continua</Text>
         </Pressable>
       </View>

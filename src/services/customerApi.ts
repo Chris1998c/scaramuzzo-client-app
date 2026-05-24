@@ -13,6 +13,13 @@ import {
   type CustomerAvailabilitySlot,
   type AvailabilityResponse,
   type FetchAvailabilityParams,
+  type CreateBookingPayload,
+  type CreateBookingResponse,
+  type CustomerBooking,
+  type CustomerBookingListItem,
+  type BookingsListResponse,
+  type FetchBookingsParams,
+  type CancelBookingResponse,
   type VerifyCustomerClaimOtpPayload,
   type VerifyCustomerClaimOtpResponse,
 } from '@/types/customerApi';
@@ -133,6 +140,80 @@ export async function fetchAvailability({
   );
 
   return data.slots ?? [];
+}
+
+function generateIdempotencyKey(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+}
+
+export async function createBooking(payload: CreateBookingPayload): Promise<CustomerBooking> {
+  const body: Record<string, unknown> = {
+    salon_id: payload.salon_id,
+    service_ids: payload.service_ids,
+    staff_id: payload.staff_id,
+    start_time: payload.start_time,
+  };
+
+  if (payload.notes?.trim()) {
+    body.notes = payload.notes.trim();
+  }
+
+  const data = await customerFetch<CreateBookingResponse>('/api/customer/v1/bookings', {
+    method: 'POST',
+    headers: {
+      'Idempotency-Key': generateIdempotencyKey(),
+    },
+    body: JSON.stringify(body),
+  });
+
+  return data.booking;
+}
+
+export async function fetchBookings(
+  params?: FetchBookingsParams,
+): Promise<CustomerBookingListItem[]> {
+  const searchParams = new URLSearchParams();
+
+  if (params?.status) {
+    searchParams.set('status', params.status);
+  }
+
+  if (params?.from) {
+    searchParams.set('from', params.from);
+  }
+
+  if (params?.to) {
+    searchParams.set('to', params.to);
+  }
+
+  if (params?.salonId !== undefined) {
+    searchParams.set('salon_id', String(params.salonId));
+  }
+
+  if (params?.limit !== undefined) {
+    searchParams.set('limit', String(params.limit));
+  }
+
+  const query = searchParams.toString();
+  const path = `/api/customer/v1/bookings${query ? `?${query}` : ''}`;
+  const data = await customerFetch<BookingsListResponse>(path);
+
+  return data.bookings ?? [];
+}
+
+export async function cancelBooking(
+  bookingId: number,
+): Promise<CancelBookingResponse['booking']> {
+  const data = await customerFetch<CancelBookingResponse>(
+    `/api/customer/v1/bookings/${bookingId}`,
+    { method: 'DELETE' },
+  );
+
+  return data.booking;
 }
 
 export async function requestCustomerClaimOtp(

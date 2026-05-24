@@ -90,6 +90,11 @@ export default function HomeScreen() {
               <View style={styles.buttonRow}>
                 <Pressable
                   style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
+                  onPress={() => router.push('/bookings')}>
+                  <Text style={styles.buttonText}>Le mie prenotazioni</Text>
+                </Pressable>
+                <Pressable
+                  style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
                   onPress={() => router.push('/book')}>
                   <Text style={styles.buttonText}>Prenota ora</Text>
                 </Pressable>

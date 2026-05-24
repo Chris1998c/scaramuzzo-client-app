@@ -55,6 +55,83 @@ export type FetchAvailabilityParams = {
   staffId?: string | number;
 };
 
+export type CreateBookingPayload = {
+  salon_id: number;
+  service_ids: number[];
+  staff_id: number;
+  start_time: string;
+  notes?: string;
+};
+
+export type CustomerBookingService = {
+  service_id: number;
+  staff_id: number;
+  start_time: string;
+  end_time: string;
+  duration: number;
+  price: number;
+};
+
+export type CustomerBooking = {
+  id: number;
+  salon_id: number;
+  start_time: string;
+  end_time: string;
+  status: string;
+  source: string;
+  notes: string | null;
+  services: CustomerBookingService[];
+};
+
+export type CreateBookingResponse = {
+  booking: CustomerBooking;
+};
+
+export type CustomerBookingListService = {
+  service_id: number;
+  service_name: string;
+  staff_id: number | null;
+  staff_name: string | null;
+  start_time: string;
+  end_time: string;
+  duration: number;
+  price: number;
+  vat_rate: number;
+};
+
+export type CustomerBookingListItem = {
+  id: number;
+  salon_id: number;
+  salon_name: string;
+  start_time: string;
+  end_time: string;
+  status: string;
+  source: string;
+  notes: string | null;
+  services: CustomerBookingListService[];
+};
+
+export type BookingsListResponse = {
+  bookings: CustomerBookingListItem[];
+};
+
+export type FetchBookingsParams = {
+  status?: string;
+  from?: string;
+  to?: string;
+  salonId?: number;
+  limit?: number;
+};
+
+export type CancelBookingResponse = {
+  booking: {
+    id: number;
+    status: 'cancelled';
+  };
+};
+
+export type BookingTab = 'upcoming' | 'past' | 'cancelled';
+
 export type RequestCustomerClaimOtpPayload = {
   customer_code: string;
 };
