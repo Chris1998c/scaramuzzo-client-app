@@ -1,7 +1,9 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { router } from 'expo-router';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { supabase } from '@/lib/supabase';
 import { fetchSalons } from '@/services/customerApi';
 import { useAuthStore } from '@/store/authStore';
 import { CustomerApiError } from '@/types/customerApi';
@@ -23,7 +25,9 @@ export default function HomeScreen() {
   const session = useAuthStore((state) => state.session);
   const user = useAuthStore((state) => state.user);
   const isLoading = useAuthStore((state) => state.isLoading);
+  const clearSession = useAuthStore((state) => state.clearSession);
   const isLoggedIn = Boolean(session);
+  const queryClient = useQueryClient();
 
   const {
     data: salons,
@@ -36,7 +40,17 @@ export default function HomeScreen() {
     enabled: false,
   });
 
-  const salonsError = error ? getErrorMessage(error) : null;
+  const salonsError = error
+    ? error instanceof CustomerApiError && error.status === 403
+      ? 'Prima collega il tuo profilo cliente.'
+      : getErrorMessage(error)
+    : null;
+
+  async function handleLogout() {
+    await supabase.auth.signOut();
+    clearSession();
+    queryClient.removeQueries({ queryKey: ['customer', 'salons'] });
+  }
 
   if (isLoading) {
     return (
@@ -60,6 +74,11 @@ export default function HomeScreen() {
             <Text style={styles.cardText}>
               Effettua l&apos;accesso per consultare i saloni e prenotare il tuo appuntamento.
             </Text>
+            <Pressable
+              style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
+              onPress={() => router.push('/login')}>
+              <Text style={styles.buttonText}>Accedi</Text>
+            </Pressable>
           </View>
         ) : (
           <>
@@ -68,16 +87,36 @@ export default function HomeScreen() {
               <Text style={styles.cardText}>
                 Sei connesso. Carica i saloni disponibili dal backend Manager.
               </Text>
-              <Pressable
-                style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
-                onPress={() => refetch()}
-                disabled={isFetching}>
-                {isFetching ? (
-                  <ActivityIndicator color={colors.background} />
-                ) : (
-                  <Text style={styles.buttonText}>Carica saloni</Text>
-                )}
-              </Pressable>
+              <View style={styles.buttonRow}>
+                <Pressable
+                  style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
+                  onPress={() => router.push('/book')}>
+                  <Text style={styles.buttonText}>Prenota ora</Text>
+                </Pressable>
+                <Pressable
+                  style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
+                  onPress={() => router.push('/claim')}>
+                  <Text style={styles.buttonText}>Collega profilo</Text>
+                </Pressable>
+                <Pressable
+                  style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
+                  onPress={() => refetch()}
+                  disabled={isFetching}>
+                  {isFetching ? (
+                    <ActivityIndicator color={colors.background} />
+                  ) : (
+                    <Text style={styles.buttonText}>Carica saloni</Text>
+                  )}
+                </Pressable>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.secondaryButton,
+                    pressed && styles.buttonPressed,
+                  ]}
+                  onPress={handleLogout}>
+                  <Text style={styles.secondaryButtonText}>Esci</Text>
+                </Pressable>
+              </View>
             </View>
 
             {salonsError ? (
@@ -160,13 +199,30 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   button: {
-    alignSelf: 'flex-start',
     backgroundColor: colors.gold,
     borderRadius: 12,
     paddingHorizontal: 28,
     paddingVertical: 14,
     minWidth: 140,
     alignItems: 'center',
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  secondaryButton: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    paddingHorizontal: 28,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  secondaryButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
   },
   buttonPressed: {
     opacity: 0.85,
