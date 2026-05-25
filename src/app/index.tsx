@@ -1,14 +1,15 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { supabase } from '@/lib/supabase';
-import { profileLinkQueryKey } from '@/lib/queryKeys';
-import { fetchSalons } from '@/services/customerApi';
+import { AppHeader } from '@/components/ui/AppHeader';
+import { GlassCard } from '@/components/ui/GlassCard';
+import { PrimaryButton } from '@/components/ui/PrimaryButton';
+import { useProfileLinkStatus } from '@/hooks/useProfileLinkStatus';
 import { useAuthStore } from '@/store/authStore';
 import { CustomerApiError } from '@/types/customerApi';
 import { colors } from '@/theme/colors';
+import { screenPadding } from '@/theme/glass';
 
 function getErrorMessage(error: unknown): string {
   if (error instanceof CustomerApiError) {
@@ -23,39 +24,16 @@ function getErrorMessage(error: unknown): string {
 }
 
 export default function HomeScreen() {
-  const session = useAuthStore((state) => state.session);
   const user = useAuthStore((state) => state.user);
   const isAuthLoading = useAuthStore((state) => state.isLoading);
-  const clearSession = useAuthStore((state) => state.clearSession);
-  const isLoggedIn = Boolean(session);
-  const queryClient = useQueryClient();
-
   const {
-    data: salons,
-    error: profileError,
-    isLoading: isProfileLoading,
-  } = useQuery({
-    queryKey: profileLinkQueryKey,
-    queryFn: fetchSalons,
-    enabled: isLoggedIn,
-    retry: (failureCount, err) => {
-      if (err instanceof CustomerApiError && err.status === 403) {
-        return false;
-      }
-
-      return failureCount < 1;
-    },
-  });
-
-  const isProfileUnlinked =
-    profileError instanceof CustomerApiError && profileError.status === 403;
-  const isProfileLinked = isLoggedIn && !isProfileLoading && !profileError && Boolean(salons);
-
-  async function handleLogout() {
-    await supabase.auth.signOut();
-    clearSession();
-    queryClient.removeQueries({ queryKey: profileLinkQueryKey });
-  }
+    isLoggedIn,
+    isProfileLinked,
+    isProfileUnlinked,
+    isProfileLoading,
+    profileError,
+    salons,
+  } = useProfileLinkStatus();
 
   if (isAuthLoading) {
     return (
@@ -69,101 +47,83 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.title}>Scaramuzzo</Text>
-        <Text style={styles.subtitle}>Prenota il tuo appuntamento</Text>
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <AppHeader
+          large
+          title="Scaramuzzo"
+          subtitle="Il tuo salone, sempre a portata di mano"
+        />
+
+        <View style={styles.heroAccent} />
 
         {!isLoggedIn ? (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Accedi per prenotare</Text>
+          <GlassCard>
+            <Text style={styles.cardTitle}>Benvenuto</Text>
             <Text style={styles.cardText}>
-              Effettua l&apos;accesso per consultare i saloni e prenotare il tuo appuntamento.
+              Accedi per collegare il profilo cliente e prenotare i tuoi appuntamenti.
             </Text>
-            <Pressable
-              style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
-              onPress={() => router.push('/login')}>
-              <Text style={styles.buttonText}>Accedi</Text>
-            </Pressable>
-          </View>
+            <PrimaryButton label="Accedi" onPress={() => router.push('/login')} />
+          </GlassCard>
         ) : isProfileLoading ? (
-          <View style={styles.card}>
+          <GlassCard contentStyle={styles.loadingCard}>
             <ActivityIndicator color={colors.gold} />
-            <Text style={styles.cardText}>Verifica profilo in corso...</Text>
-          </View>
+            <Text style={styles.cardText}>Verifica profilo in corso…</Text>
+          </GlassCard>
         ) : isProfileUnlinked ? (
-          <View style={styles.card}>
+          <GlassCard>
+            <View style={styles.statusBadge}>
+              <Text style={styles.statusBadgeText}>Profilo da collegare</Text>
+            </View>
             <Text style={styles.cardTitle}>Collega il tuo profilo</Text>
             <Text style={styles.cardText}>
-              Per prenotare devi collegare il tuo account cliente Scaramuzzo con il codice che ti
-              ha fornito il salone.
+              Per prenotare devi associare il numero di telefono della tua scheda cliente Scaramuzzo.
             </Text>
-            <Pressable
-              style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
-              onPress={() => router.push('/claim')}>
-              <Text style={styles.buttonText}>Collega profilo</Text>
-            </Pressable>
-            <Pressable
-              style={({ pressed }) => [styles.secondaryButton, pressed && styles.buttonPressed]}
-              onPress={handleLogout}>
-              <Text style={styles.secondaryButtonText}>Esci</Text>
-            </Pressable>
-          </View>
+            <PrimaryButton label="Collega profilo" onPress={() => router.push('/claim')} />
+          </GlassCard>
         ) : profileError ? (
-          <View style={styles.errorCard}>
+          <GlassCard>
             <Text style={styles.errorText}>{getErrorMessage(profileError)}</Text>
-            <Pressable
-              style={({ pressed }) => [styles.secondaryButton, pressed && styles.buttonPressed]}
-              onPress={handleLogout}>
-              <Text style={styles.secondaryButtonText}>Esci</Text>
-            </Pressable>
-          </View>
+          </GlassCard>
         ) : isProfileLinked ? (
           <>
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>Ciao{user?.email ? `, ${user.email}` : ''}</Text>
-              <Text style={styles.cardText}>
-                Profilo collegato. Prenota un appuntamento o consulta le tue prenotazioni.
-              </Text>
-              <View style={styles.buttonRow}>
-                <Pressable
-                  style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
-                  onPress={() => router.push('/book')}>
-                  <Text style={styles.buttonText}>Prenota ora</Text>
-                </Pressable>
-                <Pressable
-                  style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
-                  onPress={() => router.push('/bookings')}>
-                  <Text style={styles.buttonText}>Le mie prenotazioni</Text>
-                </Pressable>
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.secondaryButton,
-                    pressed && styles.buttonPressed,
-                  ]}
-                  onPress={handleLogout}>
-                  <Text style={styles.secondaryButtonText}>Esci</Text>
-                </Pressable>
+            <GlassCard>
+              <View style={[styles.statusBadge, styles.statusBadgeLinked]}>
+                <Text style={[styles.statusBadgeText, styles.statusBadgeTextLinked]}>
+                  Profilo collegato
+                </Text>
               </View>
-            </View>
+              <Text style={styles.cardTitle}>
+                Ciao{user?.email ? `, ${user.email.split('@')[0]}` : ''}
+              </Text>
+              <Text style={styles.cardText}>
+                Prenota un nuovo appuntamento o consulta le tue prenotazioni.
+              </Text>
+              <PrimaryButton label="Prenota ora" onPress={() => router.push('/book')} />
+              <PrimaryButton
+                label="Le mie prenotazioni"
+                variant="secondary"
+                onPress={() => router.push('/bookings')}
+              />
+            </GlassCard>
 
             {(salons ?? []).length > 0 ? (
-              <View style={styles.list}>
-                <Text style={styles.listTitle}>Saloni disponibili</Text>
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Saloni</Text>
                 {(salons ?? []).map((salon) => (
-                  <View key={String(salon.id)} style={styles.salonCard}>
+                  <GlassCard key={String(salon.id)} contentStyle={styles.salonCard}>
                     <Text style={styles.salonName}>{salon.name}</Text>
                     {salon.city || salon.address ? (
                       <Text style={styles.salonMeta}>
                         {[salon.address, salon.city].filter(Boolean).join(' · ')}
                       </Text>
                     ) : null}
-                  </View>
+                  </GlassCard>
                 ))}
               </View>
             ) : (
-              <View style={styles.card}>
+              <GlassCard>
                 <Text style={styles.cardText}>Nessun salone disponibile al momento.</Text>
-              </View>
+              </GlassCard>
             )}
           </>
         ) : null}
@@ -182,33 +142,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  content: {
-    paddingHorizontal: 24,
-    paddingTop: 48,
-    paddingBottom: 32,
-    gap: 12,
-  },
-  title: {
-    fontSize: 40,
-    fontWeight: '600',
-    color: colors.text,
-    letterSpacing: 0.5,
-  },
-  subtitle: {
-    fontSize: 18,
-    color: colors.muted,
-    marginBottom: 24,
-  },
-  card: {
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 16,
-    padding: 24,
+  scrollContent: {
+    paddingHorizontal: screenPadding,
+    paddingBottom: 40,
     gap: 16,
   },
+  heroAccent: {
+    height: 1,
+    marginHorizontal: screenPadding,
+    marginBottom: 20,
+    backgroundColor: 'rgba(197, 165, 114, 0.35)',
+  },
+  section: {
+    gap: 12,
+    marginTop: 8,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 4,
+  },
   cardTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '600',
     color: colors.text,
   },
@@ -216,77 +172,50 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 24,
     color: colors.text,
+    opacity: 0.92,
   },
-  button: {
-    backgroundColor: colors.gold,
-    borderRadius: 12,
-    paddingHorizontal: 28,
-    paddingVertical: 14,
-    minWidth: 140,
+  loadingCard: {
     alignItems: 'center',
-  },
-  buttonRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: 12,
   },
-  secondaryButton: {
+  statusBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    backgroundColor: 'rgba(197, 165, 114, 0.15)',
     borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    paddingHorizontal: 28,
-    paddingVertical: 14,
-    alignItems: 'center',
+    borderColor: 'rgba(197, 165, 114, 0.35)',
   },
-  secondaryButtonText: {
-    fontSize: 16,
+  statusBadgeLinked: {
+    backgroundColor: 'rgba(90, 53, 32, 0.5)',
+  },
+  statusBadgeText: {
+    fontSize: 12,
     fontWeight: '600',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    color: colors.gold,
+  },
+  statusBadgeTextLinked: {
     color: colors.text,
-  },
-  buttonPressed: {
-    opacity: 0.85,
-  },
-  buttonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.background,
-  },
-  errorCard: {
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: '#8b3a3a',
-    borderRadius: 12,
-    padding: 16,
-    gap: 12,
-  },
-  errorText: {
-    color: '#f5a5a5',
-    fontSize: 14,
-  },
-  list: {
-    gap: 12,
-  },
-  listTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.text,
-    marginTop: 8,
   },
   salonCard: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    padding: 16,
-    gap: 4,
+    gap: 6,
+    paddingVertical: 16,
   },
   salonName: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '600',
     color: colors.text,
   },
   salonMeta: {
     fontSize: 14,
     color: colors.muted,
+  },
+  errorText: {
+    color: '#f5c4c4',
+    fontSize: 14,
+    lineHeight: 20,
   },
 });

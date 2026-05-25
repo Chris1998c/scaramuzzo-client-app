@@ -2,10 +2,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import {
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   StyleSheet,
   Text,
   TextInput,
@@ -13,6 +11,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AppHeader } from '@/components/ui/AppHeader';
+import { GlassCard } from '@/components/ui/GlassCard';
+import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { profileLinkQueryKey } from '@/lib/queryKeys';
 import {
   requestCustomerClaimOtpByPhone,
@@ -20,6 +21,7 @@ import {
 } from '@/services/customerApi';
 import { CustomerApiError, type CustomerClaimErrorBody } from '@/types/customerApi';
 import { colors } from '@/theme/colors';
+import { inputStyle, screenPadding } from '@/theme/glass';
 
 function getClaimErrorCode(error: CustomerApiError): string | undefined {
   const body = error.body;
@@ -39,15 +41,19 @@ function getErrorMessage(error: unknown): string {
     }
 
     if (error.status === 401) {
-      return 'Sessione scaduta. Esci e accedi di nuovo.';
+      return 'La sessione è scaduta. Esci e accedi di nuovo, poi riprova.';
     }
 
     if (error.status === 404) {
-      return 'Non abbiamo trovato un profilo associato a questo numero.';
+      return 'Non abbiamo trovato un profilo con questo numero. Controlla le cifre o chiedi al salone.';
     }
 
     if (error.status === 409 && getClaimErrorCode(error) === 'phone_ambiguous') {
-      return 'Abbiamo trovato più profili con questo numero. Contatta il salone.';
+      return 'Abbiamo trovato più profili con questo numero. Contatta il salone per assistenza.';
+    }
+
+    if (error.status === 400) {
+      return 'Il codice non è valido o è scaduto. Richiedine uno nuovo.';
     }
 
     return error.message;
@@ -57,7 +63,29 @@ function getErrorMessage(error: unknown): string {
     return error.message;
   }
 
-  return 'Si è verificato un errore imprevisto.';
+  return 'Qualcosa non ha funzionato. Riprova tra poco.';
+}
+
+type ClaimStep = 1 | 2;
+
+function ClaimStepIndicator({ step }: { step: ClaimStep }) {
+  return (
+    <View style={stepStyles.row}>
+      <View style={stepStyles.item}>
+        <View style={[stepStyles.dot, step >= 1 && stepStyles.dotActive]}>
+          <Text style={[stepStyles.dotText, step >= 1 && stepStyles.dotTextActive]}>1</Text>
+        </View>
+        <Text style={[stepStyles.label, step === 1 && stepStyles.labelActive]}>Telefono</Text>
+      </View>
+      <View style={stepStyles.line} />
+      <View style={stepStyles.item}>
+        <View style={[stepStyles.dot, step >= 2 && stepStyles.dotActive]}>
+          <Text style={[stepStyles.dotText, step >= 2 && stepStyles.dotTextActive]}>2</Text>
+        </View>
+        <Text style={[stepStyles.label, step === 2 && stepStyles.labelActive]}>Codice OTP</Text>
+      </View>
+    </View>
+  );
 }
 
 export default function ClaimScreen() {
@@ -76,6 +104,7 @@ export default function ClaimScreen() {
   const isBusy = isRequesting || isVerifying;
   const canRequest = trimmedPhone.length > 0 && !isBusy;
   const canVerify = Boolean(claimPhone) && trimmedOtp.length > 0 && !isBusy;
+  const currentStep: ClaimStep = otpSent ? 2 : 1;
 
   function handlePhoneChange(value: string) {
     setPhone(value);
@@ -98,8 +127,8 @@ export default function ClaimScreen() {
 
       setSuccessMessage(
         result.delivery?.status === 'skipped'
-          ? 'Codice generato. Inserisci il codice OTP ricevuto.'
-          : 'Codice inviato via WhatsApp.',
+          ? 'Codice pronto. Inseriscilo qui sotto.'
+          : 'Ti abbiamo inviato un codice su WhatsApp.',
       );
     } catch (error) {
       setErrorMessage(getErrorMessage(error));
@@ -124,7 +153,7 @@ export default function ClaimScreen() {
         otp: trimmedOtp,
       });
       await queryClient.invalidateQueries({ queryKey: profileLinkQueryKey });
-      setSuccessMessage('Profilo collegato con successo.');
+      setSuccessMessage('Profilo collegato. Ti portiamo alla home…');
       setTimeout(() => router.replace('/'), 1200);
     } catch (error) {
       setErrorMessage(getErrorMessage(error));
@@ -138,13 +167,15 @@ export default function ClaimScreen() {
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.keyboardView}>
-        <View style={styles.content}>
-          <Text style={styles.title}>Collega il tuo profilo</Text>
-          <Text style={styles.subtitle}>
-            Inserisci il numero di telefono associato alla tua scheda cliente.
-          </Text>
+        <AppHeader
+          title="Collega il tuo profilo Scaramuzzo"
+          subtitle="Inserisci il numero associato alla tua scheda cliente."
+        />
 
-          <View style={styles.card}>
+        <View style={styles.body}>
+          <ClaimStepIndicator step={currentStep} />
+
+          <GlassCard>
             <View style={styles.field}>
               <Text style={styles.label}>Numero di telefono</Text>
               <TextInput
@@ -153,7 +184,7 @@ export default function ClaimScreen() {
                 keyboardType="phone-pad"
                 placeholder="Es. 3895817411"
                 placeholderTextColor={colors.muted}
-                style={styles.input}
+                style={inputStyle}
                 value={phone}
                 onChangeText={handlePhoneChange}
                 editable={!isBusy}
@@ -167,9 +198,9 @@ export default function ClaimScreen() {
                 autoCorrect={false}
                 keyboardType="number-pad"
                 maxLength={8}
-                placeholder="Codice a 4-8 cifre"
+                placeholder="Codice ricevuto su WhatsApp"
                 placeholderTextColor={colors.muted}
-                style={styles.input}
+                style={[inputStyle, !otpSent && styles.inputDisabled]}
                 value={otp}
                 onChangeText={setOtp}
                 editable={!isBusy && otpSent}
@@ -177,58 +208,106 @@ export default function ClaimScreen() {
             </View>
 
             {errorMessage ? (
-              <View style={styles.errorCard}>
+              <View style={styles.errorBanner}>
                 <Text style={styles.errorText}>{errorMessage}</Text>
               </View>
             ) : null}
 
             {successMessage ? (
-              <View style={styles.successCard}>
+              <View style={styles.successBanner}>
                 <Text style={styles.successText}>{successMessage}</Text>
               </View>
             ) : null}
 
-            <Pressable
-              style={({ pressed }) => [
-                styles.button,
-                (!canRequest || pressed) && styles.buttonPressed,
-                !canRequest && styles.buttonDisabled,
-              ]}
-              onPress={handleRequestOtp}
-              disabled={!canRequest}>
-              {isRequesting ? (
-                <ActivityIndicator color={colors.background} />
-              ) : (
-                <Text style={styles.buttonText}>Invia codice</Text>
-              )}
-            </Pressable>
-
-            <Pressable
-              style={({ pressed }) => [
-                styles.secondaryButton,
-                (!canVerify || pressed) && styles.buttonPressed,
-                !canVerify && styles.buttonDisabled,
-              ]}
-              onPress={handleVerifyOtp}
-              disabled={!canVerify}>
-              {isVerifying ? (
-                <ActivityIndicator color={colors.text} />
-              ) : (
-                <Text style={styles.secondaryButtonText}>Verifica</Text>
-              )}
-            </Pressable>
+            {!otpSent ? (
+              <PrimaryButton
+                label="Invia codice WhatsApp"
+                onPress={handleRequestOtp}
+                disabled={!canRequest}
+                loading={isRequesting}
+              />
+            ) : (
+              <PrimaryButton
+                label="Verifica e collega profilo"
+                onPress={handleVerifyOtp}
+                disabled={!canVerify}
+                loading={isVerifying}
+              />
+            )}
 
             {otpSent ? (
-              <Text style={styles.hint}>
-                Non hai ricevuto il codice? Verifica il numero e riprova tra qualche minuto.
-              </Text>
+              <>
+                <PrimaryButton
+                  label="Invia di nuovo il codice"
+                  variant="secondary"
+                  onPress={handleRequestOtp}
+                  disabled={!canRequest}
+                  loading={isRequesting}
+                />
+                <Text style={styles.hint}>
+                  Non arriva il messaggio? Controlla il numero e attendi qualche minuto prima di
+                  richiedere un nuovo codice.
+                </Text>
+              </>
             ) : null}
-          </View>
+          </GlassCard>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
+
+const stepStyles = StyleSheet.create({
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+    paddingHorizontal: screenPadding,
+  },
+  item: {
+    alignItems: 'center',
+    gap: 6,
+    minWidth: 88,
+  },
+  dot: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(27, 13, 8, 0.6)',
+  },
+  dotActive: {
+    borderColor: colors.gold,
+    backgroundColor: 'rgba(197, 165, 114, 0.2)',
+  },
+  dotText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.muted,
+  },
+  dotTextActive: {
+    color: colors.gold,
+  },
+  label: {
+    fontSize: 12,
+    color: colors.muted,
+  },
+  labelActive: {
+    color: colors.text,
+    fontWeight: '600',
+  },
+  line: {
+    width: 40,
+    height: 1,
+    backgroundColor: colors.border,
+    marginHorizontal: 8,
+    marginBottom: 20,
+  },
+});
 
 const styles = StyleSheet.create({
   container: {
@@ -238,30 +317,9 @@ const styles = StyleSheet.create({
   keyboardView: {
     flex: 1,
   },
-  content: {
-    flex: 1,
-    paddingHorizontal: 24,
-    paddingTop: 48,
-    gap: 12,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  subtitle: {
-    fontSize: 16,
-    lineHeight: 24,
-    color: colors.muted,
-    marginBottom: 16,
-  },
-  card: {
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 16,
-    padding: 24,
-    gap: 16,
+  body: {
+    paddingHorizontal: screenPadding,
+    paddingBottom: 32,
   },
   field: {
     gap: 8,
@@ -271,70 +329,37 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: colors.muted,
   },
-  input: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 16,
-    color: colors.text,
-  },
-  button: {
-    backgroundColor: colors.gold,
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  secondaryButton: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  buttonPressed: {
-    opacity: 0.85,
-  },
-  buttonDisabled: {
+  inputDisabled: {
     opacity: 0.5,
   },
-  buttonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.background,
-  },
-  secondaryButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  errorCard: {
-    backgroundColor: colors.surface,
+  errorBanner: {
+    backgroundColor: 'rgba(139, 58, 58, 0.25)',
     borderWidth: 1,
-    borderColor: '#8b3a3a',
-    borderRadius: 12,
-    padding: 12,
+    borderColor: 'rgba(245, 165, 165, 0.35)',
+    borderRadius: 16,
+    padding: 14,
   },
   errorText: {
-    color: '#f5a5a5',
+    color: '#f5c4c4',
     fontSize: 14,
+    lineHeight: 20,
   },
-  successCard: {
-    backgroundColor: colors.surface,
+  successBanner: {
+    backgroundColor: 'rgba(197, 165, 114, 0.12)',
     borderWidth: 1,
-    borderColor: colors.gold,
-    borderRadius: 12,
-    padding: 12,
+    borderColor: 'rgba(197, 165, 114, 0.4)',
+    borderRadius: 16,
+    padding: 14,
   },
   successText: {
     color: colors.text,
     fontSize: 14,
+    lineHeight: 20,
   },
   hint: {
     fontSize: 13,
     lineHeight: 20,
     color: colors.muted,
+    textAlign: 'center',
   },
 });

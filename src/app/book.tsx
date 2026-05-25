@@ -11,7 +11,11 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AppHeader } from '@/components/ui/AppHeader';
+import { GlassCard } from '@/components/ui/GlassCard';
+import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { fetchSalons, fetchServices } from '@/services/customerApi';
+import { screenPadding } from '@/theme/glass';
 import { useAuthStore } from '@/store/authStore';
 import { useBookingStore } from '@/store/bookingStore';
 import { CustomerApiError } from '@/types/customerApi';
@@ -110,16 +114,12 @@ export default function BookScreen() {
   if (!session) {
     return (
       <SafeAreaView style={styles.container}>
+        <AppHeader title="Prenota" subtitle="Scegli salone e servizi" />
         <View style={styles.content}>
-          <Text style={styles.title}>Prenota</Text>
-          <View style={styles.card}>
+          <GlassCard>
             <Text style={styles.cardText}>Accedi per avviare una prenotazione.</Text>
-            <Pressable
-              style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
-              onPress={() => router.push('/login')}>
-              <Text style={styles.buttonText}>Accedi</Text>
-            </Pressable>
-          </View>
+            <PrimaryButton label="Accedi" onPress={() => router.push('/login')} />
+          </GlassCard>
         </View>
       </SafeAreaView>
     );
@@ -127,8 +127,8 @@ export default function BookScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <AppHeader title="Prenota" subtitle="Scegli salone e servizi" />
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <Text style={styles.title}>Prenota</Text>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Scegli salone</Text>
@@ -259,16 +259,11 @@ export default function BookScreen() {
       </ScrollView>
 
       <View style={styles.footer}>
-        <Pressable
-          style={({ pressed }) => [
-            styles.button,
-            !hasSelectedServices && styles.buttonDisabled,
-            pressed && hasSelectedServices && styles.buttonPressed,
-          ]}
+        <PrimaryButton
+          label="Continua"
+          onPress={() => router.push('/book-step-2')}
           disabled={!hasSelectedServices}
-          onPress={() => router.push('/book-step-2')}>
-          <Text style={styles.buttonText}>Continua</Text>
-        </Pressable>
+        />
       </View>
     </SafeAreaView>
   );
@@ -286,20 +281,13 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: 24,
-    paddingTop: 48,
+    paddingHorizontal: screenPadding,
     gap: 16,
   },
   scrollContent: {
-    paddingHorizontal: 24,
-    paddingTop: 48,
+    paddingHorizontal: screenPadding,
     paddingBottom: 24,
     gap: 24,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: '600',
-    color: colors.text,
   },
   section: {
     gap: 12,
@@ -365,16 +353,16 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   salonCard: {
-    backgroundColor: colors.card,
+    backgroundColor: 'rgba(36, 17, 9, 0.65)',
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 16,
     gap: 4,
   },
   salonCardSelected: {
     borderColor: colors.gold,
-    backgroundColor: colors.surface,
+    backgroundColor: 'rgba(197, 165, 114, 0.1)',
   },
   salonName: {
     fontSize: 16,
@@ -389,10 +377,10 @@ const styles = StyleSheet.create({
     color: colors.muted,
   },
   serviceCard: {
-    backgroundColor: colors.card,
+    backgroundColor: 'rgba(36, 17, 9, 0.65)',
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 16,
     gap: 6,
   },
@@ -466,7 +454,7 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   footer: {
-    paddingHorizontal: 24,
+    paddingHorizontal: screenPadding,
     paddingVertical: 16,
     borderTopWidth: 1,
     borderTopColor: colors.border,

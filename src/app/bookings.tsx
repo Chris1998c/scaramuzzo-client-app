@@ -13,7 +13,11 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AppHeader } from '@/components/ui/AppHeader';
+import { GlassCard } from '@/components/ui/GlassCard';
+import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { cancelBooking, fetchBookings } from '@/services/customerApi';
+import { screenPadding } from '@/theme/glass';
 import { useAuthStore } from '@/store/authStore';
 import {
   CustomerApiError,
@@ -312,16 +316,15 @@ export default function BookingsScreen() {
   if (!session) {
     return (
       <SafeAreaView style={styles.container}>
+        <AppHeader
+          title="Le mie prenotazioni"
+          subtitle="Gestisci i tuoi appuntamenti Scaramuzzo"
+        />
         <View style={styles.content}>
-          <Text style={styles.title}>Le mie prenotazioni</Text>
-          <View style={styles.emptyCard}>
+          <GlassCard>
             <Text style={styles.emptyTitle}>Accedi per vedere i tuoi appuntamenti</Text>
-            <Pressable
-              style={({ pressed }) => [styles.primaryButton, pressed && styles.buttonPressed]}
-              onPress={() => router.push('/login')}>
-              <Text style={styles.primaryButtonText}>Accedi</Text>
-            </Pressable>
-          </View>
+            <PrimaryButton label="Accedi" onPress={() => router.push('/login')} />
+          </GlassCard>
         </View>
       </SafeAreaView>
     );
@@ -329,6 +332,10 @@ export default function BookingsScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <AppHeader
+        title="Le mie prenotazioni"
+        subtitle="Gestisci i tuoi appuntamenti Scaramuzzo"
+      />
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         refreshControl={
@@ -338,8 +345,6 @@ export default function BookingsScreen() {
             tintColor={colors.gold}
           />
         }>
-        <Text style={styles.title}>Le mie prenotazioni</Text>
-        <Text style={styles.subtitle}>Gestisci i tuoi appuntamenti Scaramuzzo</Text>
 
         <View style={styles.tabRow}>
           {tabs.map((tab) => {
@@ -378,7 +383,7 @@ export default function BookingsScreen() {
         ) : null}
 
         {!isLoading && !error && visibleBookings.length === 0 ? (
-          <View style={styles.emptyCard}>
+          <GlassCard>
             <Text style={styles.emptyTitle}>
               {activeTab === 'upcoming'
                 ? 'Nessuna prenotazione in programma'
@@ -392,13 +397,9 @@ export default function BookingsScreen() {
                 : 'Qui compariranno i tuoi appuntamenti.'}
             </Text>
             {activeTab === 'upcoming' ? (
-              <Pressable
-                style={({ pressed }) => [styles.primaryButton, pressed && styles.buttonPressed]}
-                onPress={() => router.push('/book')}>
-                <Text style={styles.primaryButtonText}>Prenota ora</Text>
-              </Pressable>
+              <PrimaryButton label="Prenota ora" onPress={() => router.push('/book')} />
             ) : null}
-          </View>
+          </GlassCard>
         ) : null}
 
         {!isLoading && !error
@@ -428,13 +429,11 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: 24,
-    paddingTop: 48,
+    paddingHorizontal: screenPadding,
     gap: 16,
   },
   scrollContent: {
-    paddingHorizontal: 24,
-    paddingTop: 48,
+    paddingHorizontal: screenPadding,
     paddingBottom: 32,
     gap: 16,
   },
@@ -475,10 +474,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   bookingCard: {
-    backgroundColor: colors.card,
+    backgroundColor: 'rgba(36, 17, 9, 0.65)',
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 16,
+    borderRadius: 20,
     padding: 20,
     gap: 10,
   },

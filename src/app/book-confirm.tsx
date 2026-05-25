@@ -12,7 +12,11 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AppHeader } from '@/components/ui/AppHeader';
+import { GlassCard } from '@/components/ui/GlassCard';
+import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { createBooking, fetchServices } from '@/services/customerApi';
+import { inputStyle, screenPadding } from '@/theme/glass';
 import { useBookingStore } from '@/store/bookingStore';
 import { CustomerApiError } from '@/types/customerApi';
 import { colors } from '@/theme/colors';
@@ -173,9 +177,9 @@ export default function BookConfirmScreen() {
   if (isBookingComplete && lastCreatedBooking) {
     return (
       <SafeAreaView style={styles.container}>
+        <AppHeader title="Prenotazione confermata" subtitle="Tutto pronto per il tuo appuntamento" />
         <View style={styles.successContent}>
-          <Text style={styles.title}>Prenotazione confermata</Text>
-          <View style={styles.successCard}>
+          <GlassCard>
             <Text style={styles.successText}>
               La tua prenotazione è stata registrata con successo.
             </Text>
@@ -183,12 +187,8 @@ export default function BookConfirmScreen() {
             <Text style={styles.bookingMeta}>
               {formatDateTime(lastCreatedBooking.start_time)}
             </Text>
-          </View>
-          <Pressable
-            style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
-            onPress={handleGoHome}>
-            <Text style={styles.buttonText}>Torna alla home</Text>
-          </Pressable>
+            <PrimaryButton label="Torna alla home" onPress={handleGoHome} />
+          </GlassCard>
         </View>
       </SafeAreaView>
     );
@@ -196,11 +196,12 @@ export default function BookConfirmScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <AppHeader
+        title="Conferma prenotazione"
+        subtitle="Controlla i dettagli prima di confermare"
+      />
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <Text style={styles.title}>Conferma prenotazione</Text>
-        <Text style={styles.subtitle}>Controlla i dettagli prima di confermare.</Text>
-
-        <View style={styles.card}>
+        <GlassCard contentStyle={styles.cardInner}>
           <View style={styles.row}>
             <Text style={styles.label}>Salone</Text>
             <Text style={styles.value}>{selectedSalonName}</Text>
@@ -245,7 +246,7 @@ export default function BookConfirmScreen() {
               </View>
             </>
           ) : null}
-        </View>
+        </GlassCard>
 
         <View style={styles.field}>
           <Text style={styles.label}>Note (opzionale)</Text>
@@ -254,7 +255,7 @@ export default function BookConfirmScreen() {
             numberOfLines={3}
             placeholder="Aggiungi una nota per il salone..."
             placeholderTextColor={colors.muted}
-            style={styles.notesInput}
+            style={[inputStyle, styles.notesInput]}
             value={notes}
             onChangeText={setNotes}
             editable={!isSubmitting}
@@ -283,20 +284,12 @@ export default function BookConfirmScreen() {
       </ScrollView>
 
       <View style={styles.footer}>
-        <Pressable
-          style={({ pressed }) => [
-            styles.button,
-            isSubmitting && styles.buttonDisabled,
-            pressed && !isSubmitting && styles.buttonPressed,
-          ]}
+        <PrimaryButton
+          label="Conferma prenotazione"
           onPress={handleConfirm}
-          disabled={isSubmitting}>
-          {isSubmitting ? (
-            <ActivityIndicator color={colors.background} />
-          ) : (
-            <Text style={styles.buttonText}>Conferma prenotazione</Text>
-          )}
-        </Pressable>
+          disabled={isSubmitting}
+          loading={isSubmitting}
+        />
       </View>
     </SafeAreaView>
   );
@@ -314,15 +307,17 @@ const styles = StyleSheet.create({
   },
   successContent: {
     flex: 1,
-    paddingHorizontal: 24,
+    paddingHorizontal: screenPadding,
     paddingTop: 48,
     gap: 24,
   },
   scrollContent: {
-    paddingHorizontal: 24,
-    paddingTop: 48,
+    paddingHorizontal: screenPadding,
     paddingBottom: 24,
     gap: 20,
+  },
+  cardInner: {
+    gap: 12,
   },
   title: {
     fontSize: 32,
@@ -441,7 +436,7 @@ const styles = StyleSheet.create({
     color: colors.muted,
   },
   footer: {
-    paddingHorizontal: 24,
+    paddingHorizontal: screenPadding,
     paddingVertical: 16,
     borderTopWidth: 1,
     borderTopColor: colors.border,

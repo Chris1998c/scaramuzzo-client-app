@@ -1,10 +1,8 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
 import {
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   StyleSheet,
   Text,
   TextInput,
@@ -12,8 +10,12 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AppHeader } from '@/components/ui/AppHeader';
+import { GlassCard } from '@/components/ui/GlassCard';
+import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { supabase } from '@/lib/supabase';
 import { colors } from '@/theme/colors';
+import { inputStyle, screenPadding } from '@/theme/glass';
 
 function getAuthErrorMessage(error: unknown): string {
   if (error instanceof Error) {
@@ -79,11 +81,10 @@ export default function LoginScreen() {
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.keyboardView}>
-        <View style={styles.content}>
-          <Text style={styles.title}>Accedi</Text>
-          <Text style={styles.subtitle}>Usa la tua email per accedere o registrarti</Text>
+        <AppHeader title="Accedi" subtitle="Usa la tua email per accedere o registrarti" />
 
-          <View style={styles.card}>
+        <View style={styles.body}>
+          <GlassCard>
             <View style={styles.field}>
               <Text style={styles.label}>Email</Text>
               <TextInput
@@ -93,7 +94,7 @@ export default function LoginScreen() {
                 keyboardType="email-address"
                 placeholder="nome@email.com"
                 placeholderTextColor={colors.muted}
-                style={styles.input}
+                style={inputStyle}
                 value={email}
                 onChangeText={setEmail}
                 editable={!isLoading}
@@ -108,7 +109,7 @@ export default function LoginScreen() {
                 placeholder="••••••••"
                 placeholderTextColor={colors.muted}
                 secureTextEntry
-                style={styles.input}
+                style={inputStyle}
                 value={password}
                 onChangeText={setPassword}
                 editable={!isLoading}
@@ -116,37 +117,24 @@ export default function LoginScreen() {
             </View>
 
             {errorMessage ? (
-              <View style={styles.errorCard}>
+              <View style={styles.errorBanner}>
                 <Text style={styles.errorText}>{errorMessage}</Text>
               </View>
             ) : null}
 
-            <Pressable
-              style={({ pressed }) => [
-                styles.button,
-                (!canSubmit || pressed) && styles.buttonPressed,
-                !canSubmit && styles.buttonDisabled,
-              ]}
+            <PrimaryButton
+              label="Accedi"
               onPress={handleSignIn}
-              disabled={!canSubmit}>
-              {isLoading ? (
-                <ActivityIndicator color={colors.background} />
-              ) : (
-                <Text style={styles.buttonText}>Accedi</Text>
-              )}
-            </Pressable>
-
-            <Pressable
-              style={({ pressed }) => [
-                styles.secondaryButton,
-                pressed && styles.buttonPressed,
-                isLoading && styles.buttonDisabled,
-              ]}
+              disabled={!canSubmit}
+              loading={isLoading}
+            />
+            <PrimaryButton
+              label="Registrati"
+              variant="secondary"
               onPress={handleSignUp}
-              disabled={!canSubmit}>
-              <Text style={styles.secondaryButtonText}>Registrati</Text>
-            </Pressable>
-          </View>
+              disabled={!canSubmit}
+            />
+          </GlassCard>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -161,29 +149,9 @@ const styles = StyleSheet.create({
   keyboardView: {
     flex: 1,
   },
-  content: {
-    flex: 1,
-    paddingHorizontal: 24,
-    paddingTop: 48,
-    gap: 12,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: colors.muted,
-    marginBottom: 16,
-  },
-  card: {
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 16,
-    padding: 24,
-    gap: 16,
+  body: {
+    paddingHorizontal: screenPadding,
+    paddingBottom: 32,
   },
   field: {
     gap: 8,
@@ -193,54 +161,15 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: colors.muted,
   },
-  input: {
-    backgroundColor: colors.surface,
+  errorBanner: {
+    backgroundColor: 'rgba(139, 58, 58, 0.25)',
     borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 16,
-    color: colors.text,
-  },
-  button: {
-    backgroundColor: colors.gold,
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  secondaryButton: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  buttonPressed: {
-    opacity: 0.85,
-  },
-  buttonDisabled: {
-    opacity: 0.5,
-  },
-  buttonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.background,
-  },
-  secondaryButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  errorCard: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: '#8b3a3a',
-    borderRadius: 12,
-    padding: 12,
+    borderColor: 'rgba(245, 165, 165, 0.35)',
+    borderRadius: 16,
+    padding: 14,
   },
   errorText: {
-    color: '#f5a5a5',
+    color: '#f5c4c4',
     fontSize: 14,
   },
 });

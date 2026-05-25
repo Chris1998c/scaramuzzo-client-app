@@ -11,7 +11,10 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AppHeader } from '@/components/ui/AppHeader';
+import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { fetchAvailability, fetchStaff } from '@/services/customerApi';
+import { screenPadding } from '@/theme/glass';
 import { useBookingStore } from '@/store/bookingStore';
 import { CustomerApiError, type CustomerAvailabilitySlot } from '@/types/customerApi';
 import { colors } from '@/theme/colors';
@@ -140,12 +143,11 @@ export default function BookStep2Screen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <AppHeader
+        title="Scegli orario"
+        subtitle={`${selectedSalonName} · ${selectedServiceIds.length} servizi selezionati`}
+      />
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <Text style={styles.title}>Scegli orario</Text>
-        <Text style={styles.subtitle}>
-          {selectedSalonName} · {selectedServiceIds.length} servizi selezionati
-        </Text>
-
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Collaboratore</Text>
 
@@ -270,16 +272,11 @@ export default function BookStep2Screen() {
       </ScrollView>
 
       <View style={styles.footer}>
-        <Pressable
-          style={({ pressed }) => [
-            styles.button,
-            !selectedSlot && styles.buttonDisabled,
-            pressed && selectedSlot && styles.buttonPressed,
-          ]}
+        <PrimaryButton
+          label="Continua"
+          onPress={() => router.push('/book-confirm')}
           disabled={!selectedSlot}
-          onPress={() => router.push('/book-confirm')}>
-          <Text style={styles.buttonText}>Continua</Text>
-        </Pressable>
+        />
       </View>
     </SafeAreaView>
   );
@@ -296,8 +293,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   scrollContent: {
-    paddingHorizontal: 24,
-    paddingTop: 48,
+    paddingHorizontal: screenPadding,
     paddingBottom: 24,
     gap: 24,
   },
@@ -432,7 +428,7 @@ const styles = StyleSheet.create({
     color: colors.gold,
   },
   footer: {
-    paddingHorizontal: 24,
+    paddingHorizontal: screenPadding,
     paddingVertical: 16,
     borderTopWidth: 1,
     borderTopColor: colors.border,
