@@ -3,8 +3,8 @@ import { supabase } from '@/lib/supabase';
 import {
   CustomerApiError,
   type CustomerSalon,
-  type RequestCustomerClaimOtpPayload,
-  type RequestCustomerClaimOtpResponse,
+  type RequestCustomerClaimOtpByPhonePayload,
+  type RequestCustomerClaimOtpByPhoneResponse,
   type SalonsResponse,
   type ServicesResponse,
   type CustomerService,
@@ -20,8 +20,8 @@ import {
   type BookingsListResponse,
   type FetchBookingsParams,
   type CancelBookingResponse,
-  type VerifyCustomerClaimOtpPayload,
-  type VerifyCustomerClaimOtpResponse,
+  type VerifyCustomerClaimOtpByPhonePayload,
+  type VerifyCustomerClaimOtpByPhoneResponse,
 } from '@/types/customerApi';
 
 const SESSION_EXPIRED_MESSAGE = "Sessione scaduta. Effettua di nuovo l'accesso.";
@@ -273,20 +273,26 @@ export async function cancelBooking(
   return data.booking;
 }
 
-export async function requestCustomerClaimOtp(
-  payload: RequestCustomerClaimOtpPayload,
-): Promise<RequestCustomerClaimOtpResponse> {
-  return customerFetch<RequestCustomerClaimOtpResponse>('/api/customer/claim/request-otp', {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  });
+export async function requestCustomerClaimOtpByPhone(
+  payload: RequestCustomerClaimOtpByPhonePayload,
+): Promise<RequestCustomerClaimOtpByPhoneResponse> {
+  return customerFetch<RequestCustomerClaimOtpByPhoneResponse>(
+    '/api/customer/claim/request-otp-by-phone',
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    },
+  );
 }
 
-export async function verifyCustomerClaimOtp(
-  payload: VerifyCustomerClaimOtpPayload,
-): Promise<VerifyCustomerClaimOtpResponse> {
-  return customerFetch<VerifyCustomerClaimOtpResponse>('/api/customer/claim/verify-otp', {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  });
+export async function verifyCustomerClaimOtpByPhone(
+  payload: VerifyCustomerClaimOtpByPhonePayload,
+): Promise<VerifyCustomerClaimOtpByPhoneResponse> {
+  return customerFetch<VerifyCustomerClaimOtpByPhoneResponse>(
+    '/api/customer/claim/verify-otp-by-phone',
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    },
+  );
 }

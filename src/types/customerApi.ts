@@ -132,11 +132,11 @@ export type CancelBookingResponse = {
 
 export type BookingTab = 'upcoming' | 'past' | 'cancelled';
 
-export type RequestCustomerClaimOtpPayload = {
-  customer_code: string;
+export type RequestCustomerClaimOtpByPhonePayload = {
+  phone: string;
 };
 
-export type RequestCustomerClaimOtpResponse = {
+export type RequestCustomerClaimOtpByPhoneResponse = {
   success: true;
   challenge_id: string;
   expires_at: string;
@@ -145,17 +145,15 @@ export type RequestCustomerClaimOtpResponse = {
     status: string;
     reason?: string;
   };
-  _debug_otp?: string;
 };
 
-export type VerifyCustomerClaimOtpPayload = {
-  customer_code: string;
+export type VerifyCustomerClaimOtpByPhonePayload = {
+  phone: string;
   otp: string;
 };
 
-export type VerifyCustomerClaimOtpResponse = {
+export type VerifyCustomerClaimOtpByPhoneResponse = {
   success: true;
-  customer_id: string;
   link_id: string | null;
 };
 

@@ -15,11 +15,22 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { profileLinkQueryKey } from '@/lib/queryKeys';
 import {
-  requestCustomerClaimOtp,
-  verifyCustomerClaimOtp,
+  requestCustomerClaimOtpByPhone,
+  verifyCustomerClaimOtpByPhone,
 } from '@/services/customerApi';
-import { CustomerApiError } from '@/types/customerApi';
+import { CustomerApiError, type CustomerClaimErrorBody } from '@/types/customerApi';
 import { colors } from '@/theme/colors';
+
+function getClaimErrorCode(error: CustomerApiError): string | undefined {
+  const body = error.body;
+
+  if (typeof body === 'object' && body !== null && 'code' in body) {
+    const code = (body as CustomerClaimErrorBody).code;
+    return code ? String(code) : undefined;
+  }
+
+  return undefined;
+}
 
 function getErrorMessage(error: unknown): string {
   if (error instanceof CustomerApiError) {
@@ -29,6 +40,14 @@ function getErrorMessage(error: unknown): string {
 
     if (error.status === 401) {
       return 'Sessione scaduta. Esci e accedi di nuovo.';
+    }
+
+    if (error.status === 404) {
+      return 'Non abbiamo trovato un profilo associato a questo numero.';
+    }
+
+    if (error.status === 409 && getClaimErrorCode(error) === 'phone_ambiguous') {
+      return 'Abbiamo trovato più profili con questo numero. Contatta il salone.';
     }
 
     return error.message;
@@ -42,7 +61,8 @@ function getErrorMessage(error: unknown): string {
 }
 
 export default function ClaimScreen() {
-  const [customerCode, setCustomerCode] = useState('');
+  const [phone, setPhone] = useState('');
+  const [claimPhone, setClaimPhone] = useState<string | null>(null);
   const [otp, setOtp] = useState('');
   const [isRequesting, setIsRequesting] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
@@ -51,40 +71,56 @@ export default function ClaimScreen() {
   const [otpSent, setOtpSent] = useState(false);
   const queryClient = useQueryClient();
 
-  const trimmedCode = customerCode.trim();
+  const trimmedPhone = phone.trim();
   const trimmedOtp = otp.trim();
   const isBusy = isRequesting || isVerifying;
-  const canRequest = trimmedCode.length > 0 && !isBusy;
-  const canVerify = trimmedCode.length > 0 && trimmedOtp.length > 0 && !isBusy;
+  const canRequest = trimmedPhone.length > 0 && !isBusy;
+  const canVerify = Boolean(claimPhone) && trimmedOtp.length > 0 && !isBusy;
+
+  function handlePhoneChange(value: string) {
+    setPhone(value);
+    setClaimPhone(null);
+    setOtpSent(false);
+    setOtp('');
+  }
 
   async function handleRequestOtp() {
     setIsRequesting(true);
     setErrorMessage(null);
     setSuccessMessage(null);
+    setClaimPhone(null);
+    setOtp('');
 
     try {
-      const result = await requestCustomerClaimOtp({ customer_code: trimmedCode });
+      const result = await requestCustomerClaimOtpByPhone({ phone: trimmedPhone });
+      setClaimPhone(trimmedPhone);
       setOtpSent(true);
+
       setSuccessMessage(
         result.delivery?.status === 'skipped'
           ? 'Codice generato. Inserisci il codice OTP ricevuto.'
-          : 'Codice inviato via WhatsApp al numero in anagrafica.',
+          : 'Codice inviato via WhatsApp.',
       );
     } catch (error) {
       setErrorMessage(getErrorMessage(error));
+      setOtpSent(false);
     } finally {
       setIsRequesting(false);
     }
   }
 
   async function handleVerifyOtp() {
+    if (!claimPhone) {
+      return;
+    }
+
     setIsVerifying(true);
     setErrorMessage(null);
     setSuccessMessage(null);
 
     try {
-      await verifyCustomerClaimOtp({
-        customer_code: trimmedCode,
+      await verifyCustomerClaimOtpByPhone({
+        phone: claimPhone,
         otp: trimmedOtp,
       });
       await queryClient.invalidateQueries({ queryKey: profileLinkQueryKey });
@@ -105,21 +141,21 @@ export default function ClaimScreen() {
         <View style={styles.content}>
           <Text style={styles.title}>Collega il tuo profilo</Text>
           <Text style={styles.subtitle}>
-            Inserisci il codice cliente che ti è stato comunicato dal salone. Riceverai un codice OTP
-            via WhatsApp per confermare il collegamento.
+            Inserisci il numero di telefono associato alla tua scheda cliente.
           </Text>
 
           <View style={styles.card}>
             <View style={styles.field}>
-              <Text style={styles.label}>Codice cliente</Text>
+              <Text style={styles.label}>Numero di telefono</Text>
               <TextInput
-                autoCapitalize="characters"
+                autoCapitalize="none"
                 autoCorrect={false}
-                placeholder="Es. SC-12345"
+                keyboardType="phone-pad"
+                placeholder="Es. 3895817411"
                 placeholderTextColor={colors.muted}
                 style={styles.input}
-                value={customerCode}
-                onChangeText={setCustomerCode}
+                value={phone}
+                onChangeText={handlePhoneChange}
                 editable={!isBusy}
               />
             </View>
@@ -136,7 +172,7 @@ export default function ClaimScreen() {
                 style={styles.input}
                 value={otp}
                 onChangeText={setOtp}
-                editable={!isBusy}
+                editable={!isBusy && otpSent}
               />
             </View>
 
@@ -184,8 +220,7 @@ export default function ClaimScreen() {
 
             {otpSent ? (
               <Text style={styles.hint}>
-                Non hai ricevuto il codice? Verifica il numero in anagrafica e riprova tra qualche
-                minuto.
+                Non hai ricevuto il codice? Verifica il numero e riprova tra qualche minuto.
               </Text>
             ) : null}
           </View>
