@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppHeader } from '@/components/ui/AppHeader';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
+import { customerProfileNameQueryKey } from '@/hooks/useCustomerDisplayName';
 import { profileLinkQueryKey } from '@/lib/queryKeys';
 import {
   requestCustomerClaimOtpByPhone,
@@ -140,7 +141,10 @@ export default function ClaimScreen() {
         phone: claimPhone,
         otp: trimmedOtp,
       });
-      await queryClient.invalidateQueries({ queryKey: profileLinkQueryKey });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: profileLinkQueryKey }),
+        queryClient.invalidateQueries({ queryKey: customerProfileNameQueryKey }),
+      ]);
       setSuccessMessage('Profilo collegato. Ti portiamo alla home…');
       setTimeout(() => router.replace('/'), 1200);
     } catch (error) {

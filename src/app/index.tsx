@@ -8,14 +8,14 @@ import { GlassErrorBanner } from '@/components/ui/GlassErrorBanner';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { useProfileLinkStatus } from '@/hooks/useProfileLinkStatus';
 import { getApiErrorMessage } from '@/lib/apiErrorMessage';
-import { formatGreeting } from '@/lib/formatUserDisplayName';
+import { useCustomerDisplayName } from '@/hooks/useCustomerDisplayName';
 import { useAuthStore } from '@/store/authStore';
 import { colors } from '@/theme/colors';
 import { glass, screenPadding } from '@/theme/glass';
 
 export default function HomeScreen() {
-  const user = useAuthStore((state) => state.user);
   const isAuthLoading = useAuthStore((state) => state.isLoading);
+  const { greeting } = useCustomerDisplayName();
   const {
     isLoggedIn,
     isProfileLinked,
@@ -24,11 +24,6 @@ export default function HomeScreen() {
     profileError,
     salons,
   } = useProfileLinkStatus();
-
-  const greeting = formatGreeting({
-    email: user?.email,
-    userMetadata: user?.user_metadata ?? null,
-  });
 
   if (isAuthLoading) {
     return (
