@@ -19,7 +19,9 @@ import {
   requestCustomerClaimOtpByPhone,
   verifyCustomerClaimOtpByPhone,
 } from '@/services/customerApi';
+import { getApiErrorMessage } from '@/lib/apiErrorMessage';
 import { CustomerApiError, type CustomerClaimErrorBody } from '@/types/customerApi';
+import { GlassErrorBanner } from '@/components/ui/GlassErrorBanner';
 import { colors } from '@/theme/colors';
 import { inputStyle, screenPadding } from '@/theme/glass';
 
@@ -34,16 +36,8 @@ function getClaimErrorCode(error: CustomerApiError): string | undefined {
   return undefined;
 }
 
-function getErrorMessage(error: unknown): string {
+function getClaimErrorMessage(error: unknown): string {
   if (error instanceof CustomerApiError) {
-    if (error.message.includes('protezione Vercel') || error.message.includes('non è raggiungibile')) {
-      return error.message;
-    }
-
-    if (error.status === 401) {
-      return 'La sessione è scaduta. Esci e accedi di nuovo, poi riprova.';
-    }
-
     if (error.status === 404) {
       return 'Non abbiamo trovato un profilo con questo numero. Controlla le cifre o chiedi al salone.';
     }
@@ -55,15 +49,9 @@ function getErrorMessage(error: unknown): string {
     if (error.status === 400) {
       return 'Il codice non è valido o è scaduto. Richiedine uno nuovo.';
     }
-
-    return error.message;
   }
 
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return 'Qualcosa non ha funzionato. Riprova tra poco.';
+  return getApiErrorMessage(error);
 }
 
 type ClaimStep = 1 | 2;
@@ -131,7 +119,7 @@ export default function ClaimScreen() {
           : 'Ti abbiamo inviato un codice su WhatsApp.',
       );
     } catch (error) {
-      setErrorMessage(getErrorMessage(error));
+      setErrorMessage(getClaimErrorMessage(error));
       setOtpSent(false);
     } finally {
       setIsRequesting(false);
@@ -156,7 +144,7 @@ export default function ClaimScreen() {
       setSuccessMessage('Profilo collegato. Ti portiamo alla home…');
       setTimeout(() => router.replace('/'), 1200);
     } catch (error) {
-      setErrorMessage(getErrorMessage(error));
+      setErrorMessage(getClaimErrorMessage(error));
     } finally {
       setIsVerifying(false);
     }
@@ -207,11 +195,7 @@ export default function ClaimScreen() {
               />
             </View>
 
-            {errorMessage ? (
-              <View style={styles.errorBanner}>
-                <Text style={styles.errorText}>{errorMessage}</Text>
-              </View>
-            ) : null}
+            {errorMessage ? <GlassErrorBanner message={errorMessage} /> : null}
 
             {successMessage ? (
               <View style={styles.successBanner}>

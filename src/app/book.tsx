@@ -13,7 +13,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppHeader } from '@/components/ui/AppHeader';
 import { GlassCard } from '@/components/ui/GlassCard';
+import { GlassErrorBanner } from '@/components/ui/GlassErrorBanner';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
+import { getApiErrorMessage } from '@/lib/apiErrorMessage';
 import { fetchSalons, fetchServices } from '@/services/customerApi';
 import { screenPadding } from '@/theme/glass';
 import { useAuthStore } from '@/store/authStore';
@@ -21,20 +23,12 @@ import { useBookingStore } from '@/store/bookingStore';
 import { CustomerApiError } from '@/types/customerApi';
 import { colors } from '@/theme/colors';
 
-function getApiErrorMessage(error: unknown): string {
+function getBookErrorMessage(error: unknown): string {
   if (error instanceof CustomerApiError && error.status === 403) {
     return 'Prima collega il tuo profilo cliente.';
   }
 
-  if (error instanceof CustomerApiError) {
-    return error.message;
-  }
-
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return 'Si è verificato un errore imprevisto.';
+  return getApiErrorMessage(error);
 }
 
 function formatDuration(minutes: number): string {
@@ -142,7 +136,7 @@ export default function BookScreen() {
 
           {salonsError ? (
             <View style={styles.errorCard}>
-              <Text style={styles.errorText}>{getApiErrorMessage(salonsError)}</Text>
+              <GlassErrorBanner message={getBookErrorMessage(salonsError)} />
               {salonsError instanceof CustomerApiError && salonsError.status === 403 ? (
                 <Pressable
                   style={({ pressed }) => [styles.linkButton, pressed && styles.buttonPressed]}
@@ -198,7 +192,7 @@ export default function BookScreen() {
 
             {servicesError ? (
               <View style={styles.errorCard}>
-                <Text style={styles.errorText}>{getApiErrorMessage(servicesError)}</Text>
+                <GlassErrorBanner message={getBookErrorMessage(servicesError)} />
               </View>
             ) : null}
 

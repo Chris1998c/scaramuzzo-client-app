@@ -4,24 +4,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppHeader } from '@/components/ui/AppHeader';
 import { GlassCard } from '@/components/ui/GlassCard';
+import { GlassErrorBanner } from '@/components/ui/GlassErrorBanner';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { useProfileLinkStatus } from '@/hooks/useProfileLinkStatus';
+import { getApiErrorMessage } from '@/lib/apiErrorMessage';
+import { formatGreeting } from '@/lib/formatUserDisplayName';
 import { useAuthStore } from '@/store/authStore';
-import { CustomerApiError } from '@/types/customerApi';
 import { colors } from '@/theme/colors';
-import { screenPadding } from '@/theme/glass';
-
-function getErrorMessage(error: unknown): string {
-  if (error instanceof CustomerApiError) {
-    return error.message;
-  }
-
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return 'Si è verificato un errore imprevisto.';
-}
+import { glass, screenPadding } from '@/theme/glass';
 
 export default function HomeScreen() {
   const user = useAuthStore((state) => state.user);
@@ -35,6 +25,11 @@ export default function HomeScreen() {
     salons,
   } = useProfileLinkStatus();
 
+  const greeting = formatGreeting({
+    email: user?.email,
+    userMetadata: user?.user_metadata ?? null,
+  });
+
   if (isAuthLoading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -47,14 +42,16 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <View style={styles.frostLayer} pointerEvents="none" />
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <AppHeader
           large
+          showBrandLogo
           title="Scaramuzzo"
-          subtitle="Il tuo salone, sempre a portata di mano"
+          subtitle="Bellezza e cura, con eleganza"
         />
 
-        <View style={styles.heroAccent} />
+        <View style={styles.heroLine} />
 
         {!isLoggedIn ? (
           <GlassCard>
@@ -74,16 +71,14 @@ export default function HomeScreen() {
             <View style={styles.statusBadge}>
               <Text style={styles.statusBadgeText}>Profilo da collegare</Text>
             </View>
-            <Text style={styles.cardTitle}>Collega il tuo profilo</Text>
+            <Text style={styles.cardTitle}>{greeting}</Text>
             <Text style={styles.cardText}>
-              Per prenotare devi associare il numero di telefono della tua scheda cliente Scaramuzzo.
+              Per prenotare associa il numero di telefono della tua scheda cliente Scaramuzzo.
             </Text>
             <PrimaryButton label="Collega profilo" onPress={() => router.push('/claim')} />
           </GlassCard>
         ) : profileError ? (
-          <GlassCard>
-            <Text style={styles.errorText}>{getErrorMessage(profileError)}</Text>
-          </GlassCard>
+          <GlassErrorBanner message={getApiErrorMessage(profileError)} />
         ) : isProfileLinked ? (
           <>
             <GlassCard>
@@ -92,9 +87,7 @@ export default function HomeScreen() {
                   Profilo collegato
                 </Text>
               </View>
-              <Text style={styles.cardTitle}>
-                Ciao{user?.email ? `, ${user.email.split('@')[0]}` : ''}
-              </Text>
+              <Text style={styles.cardTitle}>{greeting}</Text>
               <Text style={styles.cardText}>
                 Prenota un nuovo appuntamento o consulta le tue prenotazioni.
               </Text>
@@ -107,19 +100,21 @@ export default function HomeScreen() {
             </GlassCard>
 
             {(salons ?? []).length > 0 ? (
-              <View style={styles.section}>
+              <GlassCard contentStyle={styles.salonsCard}>
                 <Text style={styles.sectionTitle}>Saloni</Text>
-                {(salons ?? []).map((salon) => (
-                  <GlassCard key={String(salon.id)} contentStyle={styles.salonCard}>
-                    <Text style={styles.salonName}>{salon.name}</Text>
-                    {salon.city || salon.address ? (
-                      <Text style={styles.salonMeta}>
-                        {[salon.address, salon.city].filter(Boolean).join(' · ')}
-                      </Text>
-                    ) : null}
-                  </GlassCard>
-                ))}
-              </View>
+                <View style={styles.salonList}>
+                  {(salons ?? []).map((salon) => (
+                    <View key={String(salon.id)} style={styles.salonPill}>
+                      <Text style={styles.salonName}>{salon.name}</Text>
+                      {salon.city || salon.address ? (
+                        <Text style={styles.salonMeta}>
+                          {[salon.address, salon.city].filter(Boolean).join(' · ')}
+                        </Text>
+                      ) : null}
+                    </View>
+                  ))}
+                </View>
+              </GlassCard>
             ) : (
               <GlassCard>
                 <Text style={styles.cardText}>Nessun salone disponibile al momento.</Text>
@@ -137,6 +132,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+  frostLayer: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(197, 165, 114, 0.04)',
+  },
   loadingContainer: {
     flex: 1,
     alignItems: 'center',
@@ -147,32 +146,26 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
     gap: 16,
   },
-  heroAccent: {
+  heroLine: {
     height: 1,
-    marginHorizontal: screenPadding,
-    marginBottom: 20,
-    backgroundColor: 'rgba(197, 165, 114, 0.35)',
-  },
-  section: {
-    gap: 12,
-    marginTop: 8,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.text,
     marginBottom: 4,
+    backgroundColor: 'rgba(197, 165, 114, 0.28)',
+    shadowColor: colors.gold,
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 0 },
   },
   cardTitle: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: '600',
     color: colors.text,
+    letterSpacing: 0.3,
   },
   cardText: {
     fontSize: 16,
     lineHeight: 24,
     color: colors.text,
-    opacity: 0.92,
+    opacity: 0.9,
   },
   loadingCard: {
     alignItems: 'center',
@@ -182,40 +175,52 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 20,
-    backgroundColor: 'rgba(197, 165, 114, 0.15)',
+    borderRadius: glass.radius.pill,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     borderWidth: 1,
-    borderColor: 'rgba(197, 165, 114, 0.35)',
+    borderColor: glass.borderGlow,
   },
   statusBadgeLinked: {
-    backgroundColor: 'rgba(90, 53, 32, 0.5)',
+    backgroundColor: 'rgba(197, 165, 114, 0.12)',
   },
   statusBadgeText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
-    letterSpacing: 0.6,
+    letterSpacing: 0.8,
     textTransform: 'uppercase',
     color: colors.gold,
   },
   statusBadgeTextLinked: {
     color: colors.text,
   },
-  salonCard: {
-    gap: 6,
-    paddingVertical: 16,
-  },
-  salonName: {
+  sectionTitle: {
     fontSize: 17,
     fontWeight: '600',
     color: colors.text,
   },
-  salonMeta: {
-    fontSize: 14,
-    color: colors.muted,
+  salonsCard: {
+    gap: 14,
   },
-  errorText: {
-    color: '#f5c4c4',
-    fontSize: 14,
-    lineHeight: 20,
+  salonList: {
+    gap: 10,
+  },
+  salonPill: {
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: glass.radius.md,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(197, 165, 114, 0.16)',
+    gap: 4,
+  },
+  salonName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  salonMeta: {
+    fontSize: 13,
+    color: colors.muted,
+    lineHeight: 18,
   },
 });

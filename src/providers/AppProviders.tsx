@@ -36,6 +36,10 @@ export function AppProviders({ children }: AppProvidersProps) {
           queries: {
             retry: 1,
             staleTime: 60_000,
+            throwOnError: false,
+          },
+          mutations: {
+            throwOnError: false,
           },
         },
       }),

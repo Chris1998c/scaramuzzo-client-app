@@ -13,17 +13,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppHeader } from '@/components/ui/AppHeader';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
+import { GlassErrorBanner } from '@/components/ui/GlassErrorBanner';
+import { getApiErrorMessage } from '@/lib/apiErrorMessage';
 import { supabase } from '@/lib/supabase';
 import { colors } from '@/theme/colors';
 import { inputStyle, screenPadding } from '@/theme/glass';
-
-function getAuthErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return 'Si è verificato un errore imprevisto.';
-}
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -45,7 +39,7 @@ export default function LoginScreen() {
     setIsLoading(false);
 
     if (error) {
-      setErrorMessage(getAuthErrorMessage(error));
+      setErrorMessage(getApiErrorMessage(error));
       return;
     }
 
@@ -64,7 +58,7 @@ export default function LoginScreen() {
     setIsLoading(false);
 
     if (error) {
-      setErrorMessage(getAuthErrorMessage(error));
+      setErrorMessage(getApiErrorMessage(error));
       return;
     }
 
@@ -116,11 +110,7 @@ export default function LoginScreen() {
               />
             </View>
 
-            {errorMessage ? (
-              <View style={styles.errorBanner}>
-                <Text style={styles.errorText}>{errorMessage}</Text>
-              </View>
-            ) : null}
+            {errorMessage ? <GlassErrorBanner message={errorMessage} /> : null}
 
             <PrimaryButton
               label="Accedi"

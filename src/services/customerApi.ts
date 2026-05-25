@@ -93,11 +93,20 @@ export async function customerFetch<T>(path: string, options: RequestInit = {}):
 
   const { headers: _ignoredHeaders, ...fetchOptions } = options;
 
-  const response = await fetch(url, {
-    ...fetchOptions,
-    method,
-    headers,
-  });
+  let response: Response;
+
+  try {
+    response = await fetch(url, {
+      ...fetchOptions,
+      method,
+      headers,
+    });
+  } catch {
+    throw new CustomerApiError(
+      'Connessione non disponibile. Controlla la rete e riprova.',
+      0,
+    );
+  }
 
   const contentType = response.headers.get('content-type') ?? '';
 
@@ -136,7 +145,14 @@ export async function customerFetch<T>(path: string, options: RequestInit = {}):
     return undefined as T;
   }
 
-  return response.json() as Promise<T>;
+  try {
+    return (await response.json()) as T;
+  } catch {
+    throw new CustomerApiError(
+      'Connessione non disponibile. Controlla la rete e riprova.',
+      0,
+    );
+  }
 }
 
 function parseSalonsResponse(data: SalonsResponse): CustomerSalon[] {

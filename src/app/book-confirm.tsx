@@ -15,7 +15,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppHeader } from '@/components/ui/AppHeader';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
+import { getApiErrorMessage } from '@/lib/apiErrorMessage';
 import { createBooking, fetchServices } from '@/services/customerApi';
+import { GlassErrorBanner } from '@/components/ui/GlassErrorBanner';
 import { inputStyle, screenPadding } from '@/theme/glass';
 import { useBookingStore } from '@/store/bookingStore';
 import { CustomerApiError } from '@/types/customerApi';
@@ -30,15 +32,9 @@ function getSubmitErrorMessage(error: unknown): string {
     if (error.status === 403) {
       return 'Prima collega il tuo profilo cliente.';
     }
-
-    return error.message;
   }
 
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return 'Si è verificato un errore imprevisto.';
+  return getApiErrorMessage(error);
 }
 
 function formatDuration(minutes: number): string {
@@ -263,8 +259,8 @@ export default function BookConfirmScreen() {
         </View>
 
         {submitError ? (
-          <View style={styles.errorCard}>
-            <Text style={styles.errorText}>{submitError}</Text>
+          <View style={styles.errorBlock}>
+            <GlassErrorBanner message={submitError} />
             {submitError.includes('orario non è più disponibile') ? (
               <Pressable
                 style={({ pressed }) => [styles.linkButton, pressed && styles.buttonPressed]}
@@ -392,6 +388,9 @@ const styles = StyleSheet.create({
     color: colors.text,
     minHeight: 96,
     textAlignVertical: 'top',
+  },
+  errorBlock: {
+    gap: 12,
   },
   errorCard: {
     backgroundColor: colors.card,

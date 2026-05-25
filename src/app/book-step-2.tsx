@@ -13,26 +13,20 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppHeader } from '@/components/ui/AppHeader';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
+import { getApiErrorMessage } from '@/lib/apiErrorMessage';
 import { fetchAvailability, fetchStaff } from '@/services/customerApi';
+import { GlassErrorBanner } from '@/components/ui/GlassErrorBanner';
 import { screenPadding } from '@/theme/glass';
 import { useBookingStore } from '@/store/bookingStore';
 import { CustomerApiError, type CustomerAvailabilitySlot } from '@/types/customerApi';
 import { colors } from '@/theme/colors';
 
-function getApiErrorMessage(error: unknown): string {
+function getStep2ErrorMessage(error: unknown): string {
   if (error instanceof CustomerApiError && error.status === 403) {
     return 'Prima collega il tuo profilo cliente.';
   }
 
-  if (error instanceof CustomerApiError) {
-    return error.message;
-  }
-
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return 'Si è verificato un errore imprevisto.';
+  return getApiErrorMessage(error);
 }
 
 function toIsoDate(date: Date): string {
@@ -160,7 +154,7 @@ export default function BookStep2Screen() {
 
           {staffError ? (
             <View style={styles.errorCard}>
-              <Text style={styles.errorText}>{getApiErrorMessage(staffError)}</Text>
+              <GlassErrorBanner message={getStep2ErrorMessage(staffError)} />
               {staffError instanceof CustomerApiError && staffError.status === 403 ? (
                 <Pressable
                   style={({ pressed }) => [styles.linkButton, pressed && styles.buttonPressed]}
@@ -235,7 +229,7 @@ export default function BookStep2Screen() {
 
             {availabilityError ? (
               <View style={styles.errorCard}>
-                <Text style={styles.errorText}>{getApiErrorMessage(availabilityError)}</Text>
+                <GlassErrorBanner message={getStep2ErrorMessage(availabilityError)} />
               </View>
             ) : null}
 

@@ -16,7 +16,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppHeader } from '@/components/ui/AppHeader';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
+import { getApiErrorMessage } from '@/lib/apiErrorMessage';
 import { cancelBooking, fetchBookings } from '@/services/customerApi';
+import { GlassErrorBanner } from '@/components/ui/GlassErrorBanner';
 import { screenPadding } from '@/theme/glass';
 import { useAuthStore } from '@/store/authStore';
 import {
@@ -28,20 +30,12 @@ import { colors } from '@/theme/colors';
 
 const BOOKINGS_QUERY_KEY = ['customer', 'bookings'] as const;
 
-function getApiErrorMessage(error: unknown): string {
+function getBookingsErrorMessage(error: unknown): string {
   if (error instanceof CustomerApiError && error.status === 403) {
     return 'Prima collega il tuo profilo cliente.';
   }
 
-  if (error instanceof CustomerApiError) {
-    return error.message;
-  }
-
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return 'Si è verificato un errore imprevisto.';
+  return getApiErrorMessage(error);
 }
 
 function isCancelledStatus(status: string): boolean {
@@ -293,7 +287,7 @@ export default function BookingsScreen() {
             try {
               await cancelMutation.mutateAsync(booking.id);
             } catch (cancelError) {
-              Alert.alert('Impossibile annullare', getApiErrorMessage(cancelError));
+              Alert.alert('Impossibile annullare', getBookingsErrorMessage(cancelError));
             } finally {
               setCancellingId(null);
             }
@@ -371,7 +365,7 @@ export default function BookingsScreen() {
 
         {error ? (
           <View style={styles.errorCard}>
-            <Text style={styles.errorText}>{getApiErrorMessage(error)}</Text>
+            <GlassErrorBanner message={getBookingsErrorMessage(error)} />
             {error instanceof CustomerApiError && error.status === 403 ? (
               <Pressable
                 style={({ pressed }) => [styles.linkButton, pressed && styles.buttonPressed]}

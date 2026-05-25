@@ -1,5 +1,6 @@
-import { ActivityIndicator, Pressable, StyleSheet, Text, type StyleProp, type ViewStyle } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
+import { GlassSurface } from '@/components/ui/GlassSurface';
 import { colors } from '@/theme/colors';
 import { glass } from '@/theme/glass';
 
@@ -24,31 +25,49 @@ export function PrimaryButton({
 }: PrimaryButtonProps) {
   const isDisabled = disabled || loading;
 
+  if (variant === 'secondary' || variant === 'ghost') {
+    return (
+      <Pressable
+        style={({ pressed }) => [
+          fullWidth && styles.fullWidth,
+          isDisabled && styles.disabled,
+          pressed && !isDisabled && styles.pressed,
+          style,
+        ]}
+        onPress={onPress}
+        disabled={isDisabled}>
+        <GlassSurface
+          borderRadius={glass.radius.pill}
+          intensity={glass.blur.button}
+          style={variant === 'ghost' ? styles.ghostSurface : undefined}
+          contentStyle={[styles.glassButtonInner, variant === 'ghost' && styles.ghostInner]}>
+          {loading ? (
+            <ActivityIndicator color={colors.gold} />
+          ) : (
+            <Text style={styles.labelSecondary}>{label}</Text>
+          )}
+        </GlassSurface>
+      </Pressable>
+    );
+  }
+
   return (
     <Pressable
       style={({ pressed }) => [
         styles.base,
         fullWidth && styles.fullWidth,
-        variant === 'primary' && styles.primary,
-        variant === 'secondary' && styles.secondary,
-        variant === 'ghost' && styles.ghost,
+        styles.primary,
         isDisabled && styles.disabled,
         pressed && !isDisabled && styles.pressed,
         style,
       ]}
       onPress={onPress}
       disabled={isDisabled}>
+      <View style={styles.primarySheen} />
       {loading ? (
-        <ActivityIndicator color={variant === 'primary' ? colors.background : colors.gold} />
+        <ActivityIndicator color={colors.background} />
       ) : (
-        <Text
-          style={[
-            styles.label,
-            variant === 'primary' && styles.labelPrimary,
-            variant !== 'primary' && styles.labelSecondary,
-          ]}>
-          {label}
-        </Text>
+        <Text style={[styles.label, styles.labelPrimary]}>{label}</Text>
       )}
     </Pressable>
   );
@@ -56,46 +75,64 @@ export function PrimaryButton({
 
 const styles = StyleSheet.create({
   base: {
-    borderRadius: glass.radius.md,
-    paddingVertical: 15,
-    paddingHorizontal: 22,
+    borderRadius: glass.radius.pill,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 52,
+    minHeight: 54,
+    overflow: 'hidden',
   },
   fullWidth: {
     alignSelf: 'stretch',
   },
   primary: {
     backgroundColor: colors.gold,
-    ...glass.shadow,
-  },
-  secondary: {
-    backgroundColor: 'rgba(27, 13, 8, 0.6)',
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: 'rgba(255, 255, 255, 0.22)',
+    ...glass.shadowSoft,
+    ...glass.shadowGold,
   },
-  ghost: {
+  primarySheen: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '45%',
+    backgroundColor: 'rgba(255, 255, 255, 0.14)',
+  },
+  glassButtonInner: {
+    paddingVertical: 15,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 52,
+  },
+  ghostSurface: {
+    borderColor: 'rgba(197, 165, 114, 0.22)',
+  },
+  ghostInner: {
     backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: 'rgba(197, 165, 114, 0.35)',
   },
   disabled: {
     opacity: 0.45,
   },
   pressed: {
-    opacity: 0.88,
-    transform: [{ scale: 0.99 }],
+    opacity: 0.9,
+    transform: [{ scale: 0.985 }],
   },
   label: {
     fontSize: 16,
     fontWeight: '600',
-    letterSpacing: 0.3,
+    letterSpacing: 0.35,
   },
   labelPrimary: {
     color: colors.background,
   },
   labelSecondary: {
+    fontSize: 16,
+    fontWeight: '600',
+    letterSpacing: 0.35,
     color: colors.text,
   },
 });
