@@ -24,12 +24,56 @@ import {
   type VerifyCustomerClaimOtpResponse,
 } from '@/types/customerApi';
 
-export async function getAuthToken(): Promise<string | null> {
+const SESSION_EXPIRED_MESSAGE = "Sessione scaduta. Effettua di nuovo l'accesso.";
+const SESSION_EXPIRED_UI_MESSAGE = 'Sessione scaduta. Esci e accedi di nuovo.';
+
+function resolveApiErrorMessage(status: number, rawMessage: string): string {
+  if (status === 401) {
+    if (
+      rawMessage === SESSION_EXPIRED_MESSAGE ||
+      rawMessage.startsWith('Request failed with status 401')
+    ) {
+      return SESSION_EXPIRED_UI_MESSAGE;
+    }
+  }
+
+  return rawMessage;
+}
+
+function extractErrorMessage(body: unknown, status: number): string {
+  const fallback = `Request failed with status ${status}`;
+
+  if (typeof body !== 'object' || body === null) {
+    return resolveApiErrorMessage(status, fallback);
+  }
+
+  if ('error' in body && body.error) {
+    return resolveApiErrorMessage(status, String((body as { error: unknown }).error));
+  }
+
+  if ('message' in body && body.message) {
+    return resolveApiErrorMessage(status, String((body as { message: unknown }).message));
+  }
+
+  return resolveApiErrorMessage(status, fallback);
+}
+
+export async function getAuthToken(): Promise<string> {
   const {
     data: { session },
   } = await supabase.auth.getSession();
 
-  return session?.access_token ?? null;
+  if (session?.access_token) {
+    return session.access_token;
+  }
+
+  const { data: refreshed } = await supabase.auth.refreshSession();
+
+  if (refreshed.session?.access_token) {
+    return refreshed.session.access_token;
+  }
+
+  throw new CustomerApiError(SESSION_EXPIRED_MESSAGE, 401);
 }
 
 export async function customerFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -38,39 +82,52 @@ export async function customerFetch<T>(path: string, options: RequestInit = {}):
   }
 
   const token = await getAuthToken();
-  const baseUrl = config.managerApiUrl.replace(/\/$/, '');
+  const baseUrl = config.managerApiUrl.trim().replace(/\/+$/, '');
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
   const url = `${baseUrl}${normalizedPath}`;
+  const method = (options.method ?? 'GET').toUpperCase();
 
   const headers = new Headers(options.headers);
   headers.set('Content-Type', 'application/json');
+  headers.set('Authorization', `Bearer ${token}`);
 
-  if (token) {
-    headers.set('Authorization', `Bearer ${token}`);
-  }
+  const { headers: _ignoredHeaders, ...fetchOptions } = options;
 
   const response = await fetch(url, {
-    ...options,
+    ...fetchOptions,
+    method,
     headers,
   });
 
+  const contentType = response.headers.get('content-type') ?? '';
+
   if (!response.ok) {
     let body: unknown;
+    let bodyText: string | undefined;
 
     try {
-      body = await response.json();
+      if (contentType.includes('application/json')) {
+        body = await response.json();
+      } else {
+        bodyText = await response.text();
+        body = bodyText;
+      }
     } catch {
-      body = await response.text().catch(() => undefined);
+      body = undefined;
     }
 
-    const message =
-      typeof body === 'object' && body !== null
-        ? 'error' in body && body.error
-          ? String((body as { error: unknown }).error)
-          : 'message' in body && body.message
-            ? String((body as { message: unknown }).message)
-            : `Request failed with status ${response.status}`
-        : `Request failed with status ${response.status}`;
+    if (
+      response.status === 401 &&
+      (contentType.includes('text/html') || typeof bodyText === 'string')
+    ) {
+      throw new CustomerApiError(
+        'Il backend Manager non è raggiungibile dall\'app (protezione Vercel sul deploy preview o URL errato). Usa l\'URL di produzione o disabilita la protezione del deployment.',
+        401,
+        body,
+      );
+    }
+
+    const message = extractErrorMessage(body, response.status);
 
     throw new CustomerApiError(message, response.status, body);
   }

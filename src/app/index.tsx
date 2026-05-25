@@ -4,6 +4,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { supabase } from '@/lib/supabase';
+import { profileLinkQueryKey } from '@/lib/queryKeys';
 import { fetchSalons } from '@/services/customerApi';
 import { useAuthStore } from '@/store/authStore';
 import { CustomerApiError } from '@/types/customerApi';
@@ -24,35 +25,39 @@ function getErrorMessage(error: unknown): string {
 export default function HomeScreen() {
   const session = useAuthStore((state) => state.session);
   const user = useAuthStore((state) => state.user);
-  const isLoading = useAuthStore((state) => state.isLoading);
+  const isAuthLoading = useAuthStore((state) => state.isLoading);
   const clearSession = useAuthStore((state) => state.clearSession);
   const isLoggedIn = Boolean(session);
   const queryClient = useQueryClient();
 
   const {
     data: salons,
-    error,
-    isFetching,
-    refetch,
+    error: profileError,
+    isLoading: isProfileLoading,
   } = useQuery({
-    queryKey: ['customer', 'salons'],
+    queryKey: profileLinkQueryKey,
     queryFn: fetchSalons,
-    enabled: false,
+    enabled: isLoggedIn,
+    retry: (failureCount, err) => {
+      if (err instanceof CustomerApiError && err.status === 403) {
+        return false;
+      }
+
+      return failureCount < 1;
+    },
   });
 
-  const salonsError = error
-    ? error instanceof CustomerApiError && error.status === 403
-      ? 'Prima collega il tuo profilo cliente.'
-      : getErrorMessage(error)
-    : null;
+  const isProfileUnlinked =
+    profileError instanceof CustomerApiError && profileError.status === 403;
+  const isProfileLinked = isLoggedIn && !isProfileLoading && !profileError && Boolean(salons);
 
   async function handleLogout() {
     await supabase.auth.signOut();
     clearSession();
-    queryClient.removeQueries({ queryKey: ['customer', 'salons'] });
+    queryClient.removeQueries({ queryKey: profileLinkQueryKey });
   }
 
-  if (isLoading) {
+  if (isAuthLoading) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
@@ -80,19 +85,46 @@ export default function HomeScreen() {
               <Text style={styles.buttonText}>Accedi</Text>
             </Pressable>
           </View>
-        ) : (
+        ) : isProfileLoading ? (
+          <View style={styles.card}>
+            <ActivityIndicator color={colors.gold} />
+            <Text style={styles.cardText}>Verifica profilo in corso...</Text>
+          </View>
+        ) : isProfileUnlinked ? (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Collega il tuo profilo</Text>
+            <Text style={styles.cardText}>
+              Per prenotare devi collegare il tuo account cliente Scaramuzzo con il codice che ti
+              ha fornito il salone.
+            </Text>
+            <Pressable
+              style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
+              onPress={() => router.push('/claim')}>
+              <Text style={styles.buttonText}>Collega profilo</Text>
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [styles.secondaryButton, pressed && styles.buttonPressed]}
+              onPress={handleLogout}>
+              <Text style={styles.secondaryButtonText}>Esci</Text>
+            </Pressable>
+          </View>
+        ) : profileError ? (
+          <View style={styles.errorCard}>
+            <Text style={styles.errorText}>{getErrorMessage(profileError)}</Text>
+            <Pressable
+              style={({ pressed }) => [styles.secondaryButton, pressed && styles.buttonPressed]}
+              onPress={handleLogout}>
+              <Text style={styles.secondaryButtonText}>Esci</Text>
+            </Pressable>
+          </View>
+        ) : isProfileLinked ? (
           <>
             <View style={styles.card}>
               <Text style={styles.cardTitle}>Ciao{user?.email ? `, ${user.email}` : ''}</Text>
               <Text style={styles.cardText}>
-                Sei connesso. Carica i saloni disponibili dal backend Manager.
+                Profilo collegato. Prenota un appuntamento o consulta le tue prenotazioni.
               </Text>
               <View style={styles.buttonRow}>
-                <Pressable
-                  style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
-                  onPress={() => router.push('/bookings')}>
-                  <Text style={styles.buttonText}>Le mie prenotazioni</Text>
-                </Pressable>
                 <Pressable
                   style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
                   onPress={() => router.push('/book')}>
@@ -100,18 +132,8 @@ export default function HomeScreen() {
                 </Pressable>
                 <Pressable
                   style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
-                  onPress={() => router.push('/claim')}>
-                  <Text style={styles.buttonText}>Collega profilo</Text>
-                </Pressable>
-                <Pressable
-                  style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
-                  onPress={() => refetch()}
-                  disabled={isFetching}>
-                  {isFetching ? (
-                    <ActivityIndicator color={colors.background} />
-                  ) : (
-                    <Text style={styles.buttonText}>Carica saloni</Text>
-                  )}
+                  onPress={() => router.push('/bookings')}>
+                  <Text style={styles.buttonText}>Le mie prenotazioni</Text>
                 </Pressable>
                 <Pressable
                   style={({ pressed }) => [
@@ -124,17 +146,11 @@ export default function HomeScreen() {
               </View>
             </View>
 
-            {salonsError ? (
-              <View style={styles.errorCard}>
-                <Text style={styles.errorText}>{salonsError}</Text>
-              </View>
-            ) : null}
-
-            {salons && salons.length > 0 ? (
+            {(salons ?? []).length > 0 ? (
               <View style={styles.list}>
-                <Text style={styles.listTitle}>Saloni</Text>
-                {salons.map((salon) => (
-                  <View key={salon.id} style={styles.salonCard}>
+                <Text style={styles.listTitle}>Saloni disponibili</Text>
+                {(salons ?? []).map((salon) => (
+                  <View key={String(salon.id)} style={styles.salonCard}>
                     <Text style={styles.salonName}>{salon.name}</Text>
                     {salon.city || salon.address ? (
                       <Text style={styles.salonMeta}>
@@ -144,15 +160,13 @@ export default function HomeScreen() {
                   </View>
                 ))}
               </View>
-            ) : null}
-
-            {salons && salons.length === 0 ? (
+            ) : (
               <View style={styles.card}>
-                <Text style={styles.cardText}>Nessun salone trovato.</Text>
+                <Text style={styles.cardText}>Nessun salone disponibile al momento.</Text>
               </View>
-            ) : null}
+            )}
           </>
-        )}
+        ) : null}
       </ScrollView>
     </SafeAreaView>
   );
@@ -243,6 +257,7 @@ const styles = StyleSheet.create({
     borderColor: '#8b3a3a',
     borderRadius: 12,
     padding: 16,
+    gap: 12,
   },
   errorText: {
     color: '#f5a5a5',

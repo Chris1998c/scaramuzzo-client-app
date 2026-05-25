@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import {
@@ -12,6 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { profileLinkQueryKey } from '@/lib/queryKeys';
 import {
   requestCustomerClaimOtp,
   verifyCustomerClaimOtp,
@@ -21,6 +23,14 @@ import { colors } from '@/theme/colors';
 
 function getErrorMessage(error: unknown): string {
   if (error instanceof CustomerApiError) {
+    if (error.message.includes('protezione Vercel') || error.message.includes('non è raggiungibile')) {
+      return error.message;
+    }
+
+    if (error.status === 401) {
+      return 'Sessione scaduta. Esci e accedi di nuovo.';
+    }
+
     return error.message;
   }
 
@@ -39,6 +49,7 @@ export default function ClaimScreen() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [otpSent, setOtpSent] = useState(false);
+  const queryClient = useQueryClient();
 
   const trimmedCode = customerCode.trim();
   const trimmedOtp = otp.trim();
@@ -76,6 +87,7 @@ export default function ClaimScreen() {
         customer_code: trimmedCode,
         otp: trimmedOtp,
       });
+      await queryClient.invalidateQueries({ queryKey: profileLinkQueryKey });
       setSuccessMessage('Profilo collegato con successo.');
       setTimeout(() => router.replace('/'), 1200);
     } catch (error) {
