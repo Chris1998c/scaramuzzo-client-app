@@ -16,6 +16,10 @@ import { GlassCard } from '@/components/ui/GlassCard';
 import { GlassErrorBanner } from '@/components/ui/GlassErrorBanner';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { getApiErrorMessage } from '@/lib/apiErrorMessage';
+import {
+  canContinueBooking,
+  getBlowDryRequirementState,
+} from '@/lib/bookingServiceRules';
 import { fetchSalons, fetchServices } from '@/services/customerApi';
 import { screenPadding } from '@/theme/glass';
 import { useAuthStore } from '@/store/authStore';
@@ -94,6 +98,34 @@ export default function BookScreen() {
   const totalDuration = selectedServices.reduce((sum, service) => sum + service.duration, 0);
   const totalPrice = selectedServices.reduce((sum, service) => sum + service.price, 0);
   const hasSelectedServices = selectedServiceIds.length > 0;
+
+  const blowDryState = useMemo(
+    () => getBlowDryRequirementState(services ?? [], selectedServiceIds),
+    [services, selectedServiceIds],
+  );
+
+  const canContinue = canContinueBooking(services ?? [], selectedServiceIds);
+
+  function handleContinue() {
+    if (!canContinue) {
+      return;
+    }
+
+    router.push('/book-step-2');
+  }
+
+  function handleAddBlowDry() {
+    if (blowDryState.status !== 'missing_blow_dry') {
+      return;
+    }
+
+    const piegaId = blowDryState.blowDryService.id;
+    const alreadySelected = selectedServiceIds.some((id) => String(id) === String(piegaId));
+
+    if (!alreadySelected) {
+      toggleService(piegaId);
+    }
+  }
 
   if (isAuthLoading) {
     return (
@@ -250,14 +282,30 @@ export default function BookScreen() {
             </View>
           </View>
         ) : null}
+
+        {blowDryState.status === 'missing_blow_dry' ? (
+          <GlassCard contentStyle={styles.ruleCard}>
+            <Text style={styles.ruleTitle}>Piega consigliata</Text>
+            <Text style={styles.ruleText}>
+              Per completare questo servizio è necessario aggiungere anche la piega.
+            </Text>
+            <PrimaryButton label="Aggiungi piega" onPress={handleAddBlowDry} />
+          </GlassCard>
+        ) : null}
+
+        {blowDryState.status === 'blow_dry_unavailable' ? (
+          <GlassCard contentStyle={styles.ruleCard}>
+            <Text style={styles.ruleTitle}>Piega non disponibile online</Text>
+            <Text style={styles.ruleText}>
+              La piega non risulta disponibile online. Contatta il salone per completare la
+              prenotazione.
+            </Text>
+          </GlassCard>
+        ) : null}
       </ScrollView>
 
       <View style={styles.footer}>
-        <PrimaryButton
-          label="Continua"
-          onPress={() => router.push('/book-step-2')}
-          disabled={!hasSelectedServices}
-        />
+        <PrimaryButton label="Continua" onPress={handleContinue} disabled={!canContinue} />
       </View>
     </SafeAreaView>
   );
@@ -445,6 +493,19 @@ const styles = StyleSheet.create({
   summaryValue: {
     fontSize: 14,
     fontWeight: '600',
+    color: colors.text,
+  },
+  ruleCard: {
+    gap: 12,
+  },
+  ruleTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.gold,
+  },
+  ruleText: {
+    fontSize: 15,
+    lineHeight: 22,
     color: colors.text,
   },
   footer: {
