@@ -4,27 +4,27 @@
     "slug": "scaramuzzo-client-app",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/logo-scaramuzzo.webp",
+    "icon": "./assets/images/icon.png",
     "scheme": "scaramuzzoclientapp",
     "userInterfaceStyle": "dark",
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#140905",
-        "foregroundImage": "./assets/images/logo-scaramuzzo.webp"
+        "foregroundImage": "./assets/images/adaptive-icon.png"
       },
       "predictiveBackGestureEnabled": false
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/logo-scaramuzzo.webp"
+      "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/logo-scaramuzzo.webp",
-          "imageWidth": 120,
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#140905"
         }

@@ -12,9 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GlassSurface } from '@/components/ui/GlassSurface';
 import { useProfileLinkStatus } from '@/hooks/useProfileLinkStatus';
-import { profileLinkQueryKey } from '@/lib/queryKeys';
-import { supabase } from '@/lib/supabase';
-import { useAuthStore } from '@/store/authStore';
+import { logoutCustomer } from '@/lib/clearCustomerSessionState';
 import { colors } from '@/theme/colors';
 import { glass, screenPadding } from '@/theme/glass';
 
@@ -38,7 +36,6 @@ const MENU_ICONS: Record<string, string> = {
 export function HamburgerMenu() {
   const [open, setOpen] = useState(false);
   const insets = useSafeAreaInsets();
-  const clearSession = useAuthStore((state) => state.clearSession);
   const queryClient = useQueryClient();
   const { isLoggedIn, isProfileLinked, isProfileUnlinked } = useProfileLinkStatus();
 
@@ -49,9 +46,7 @@ export function HamburgerMenu() {
 
   async function handleLogout() {
     setOpen(false);
-    await supabase.auth.signOut();
-    clearSession();
-    queryClient.removeQueries({ queryKey: profileLinkQueryKey });
+    await logoutCustomer(queryClient);
     router.replace('/');
   }
 

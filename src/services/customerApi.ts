@@ -215,7 +215,7 @@ export async function fetchAvailability({
   return data.slots ?? [];
 }
 
-function generateIdempotencyKey(): string {
+export function generateIdempotencyKey(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID();
   }
@@ -223,7 +223,16 @@ function generateIdempotencyKey(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
 }
 
-export async function createBooking(payload: CreateBookingPayload): Promise<CustomerBooking> {
+export async function createBooking(
+  payload: CreateBookingPayload,
+  idempotencyKey: string,
+): Promise<CustomerBooking> {
+  const key = idempotencyKey.trim();
+
+  if (!key) {
+    throw new Error('createBooking requires a non-empty Idempotency-Key');
+  }
+
   const body: Record<string, unknown> = {
     salon_id: payload.salon_id,
     service_ids: payload.service_ids,
@@ -238,7 +247,7 @@ export async function createBooking(payload: CreateBookingPayload): Promise<Cust
   const data = await customerFetch<CreateBookingResponse>('/api/customer/v1/bookings', {
     method: 'POST',
     headers: {
-      'Idempotency-Key': generateIdempotencyKey(),
+      'Idempotency-Key': key,
     },
     body: JSON.stringify(body),
   });

@@ -14,8 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppHeader } from '@/components/ui/AppHeader';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
-import { customerProfileNameQueryKey } from '@/hooks/useCustomerDisplayName';
-import { profileLinkQueryKey } from '@/lib/queryKeys';
+import { customerProfileNameQueryKey, profileLinkQueryKey } from '@/lib/queryKeys';
 import {
   requestCustomerClaimOtpByPhone,
   verifyCustomerClaimOtpByPhone,

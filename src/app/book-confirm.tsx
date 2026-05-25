@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -16,7 +16,8 @@ import { AppHeader } from '@/components/ui/AppHeader';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { getApiErrorMessage } from '@/lib/apiErrorMessage';
-import { createBooking, fetchServices } from '@/services/customerApi';
+import { buildBookingPayloadFingerprint } from '@/lib/bookingIdempotency';
+import { createBooking, fetchServices, generateIdempotencyKey } from '@/services/customerApi';
 import { GlassErrorBanner } from '@/components/ui/GlassErrorBanner';
 import { inputStyle, screenPadding } from '@/theme/glass';
 import { useBookingStore } from '@/store/bookingStore';
@@ -85,7 +86,60 @@ export default function BookConfirmScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
+  const idempotencyKeyRef = useRef<string | null>(null);
+  const idempotencyFingerprintRef = useRef<string | null>(null);
+
   const isBookingComplete = Boolean(lastCreatedBooking);
+
+  const bookingPayloadFingerprint = useMemo(
+    () =>
+      buildBookingPayloadFingerprint({
+        salonId: selectedSalonId,
+        serviceIds: selectedServiceIds,
+        staffId: selectedStaffId,
+        startTime: selectedSlot?.start_time,
+        notes,
+      }),
+    [
+      selectedSalonId,
+      selectedServiceIds,
+      selectedStaffId,
+      selectedSlot?.start_time,
+      notes,
+    ],
+  );
+
+  useEffect(() => {
+    if (isBookingComplete) {
+      return;
+    }
+
+    if (idempotencyFingerprintRef.current === bookingPayloadFingerprint) {
+      return;
+    }
+
+    idempotencyFingerprintRef.current = bookingPayloadFingerprint;
+    idempotencyKeyRef.current = generateIdempotencyKey();
+  }, [bookingPayloadFingerprint, isBookingComplete]);
+
+  function clearIdempotencyKey() {
+    idempotencyKeyRef.current = null;
+    idempotencyFingerprintRef.current = null;
+  }
+
+  function getSubmitIdempotencyKey(): string {
+    if (
+      idempotencyKeyRef.current &&
+      idempotencyFingerprintRef.current === bookingPayloadFingerprint
+    ) {
+      return idempotencyKeyRef.current;
+    }
+
+    const key = generateIdempotencyKey();
+    idempotencyKeyRef.current = key;
+    idempotencyFingerprintRef.current = bookingPayloadFingerprint;
+    return key;
+  }
 
   useEffect(() => {
     if (isBookingComplete) {
@@ -128,6 +182,10 @@ export default function BookConfirmScreen() {
   const totalPrice = selectedServices.reduce((sum, service) => sum + service.price, 0);
 
   async function handleConfirm() {
+    if (isSubmitting) {
+      return;
+    }
+
     if (!selectedSalonId || !selectedStaffId || !selectedSlot || selectedServiceIds.length === 0) {
       return;
     }
@@ -135,15 +193,21 @@ export default function BookConfirmScreen() {
     setIsSubmitting(true);
     setSubmitError(null);
 
-    try {
-      const booking = await createBooking({
-        salon_id: Number(selectedSalonId),
-        service_ids: selectedServiceIds.map((id) => Number(id)),
-        staff_id: Number(selectedStaffId),
-        start_time: selectedSlot.start_time,
-        notes: notes.trim() || undefined,
-      });
+    const idempotencyKey = getSubmitIdempotencyKey();
 
+    try {
+      const booking = await createBooking(
+        {
+          salon_id: Number(selectedSalonId),
+          service_ids: selectedServiceIds.map((id) => Number(id)),
+          staff_id: Number(selectedStaffId),
+          start_time: selectedSlot.start_time,
+          notes: notes.trim() || undefined,
+        },
+        idempotencyKey,
+      );
+
+      clearIdempotencyKey();
       setLastCreatedBooking(booking);
     } catch (error) {
       setSubmitError(getSubmitErrorMessage(error));
@@ -153,6 +217,7 @@ export default function BookConfirmScreen() {
   }
 
   function handleGoHome() {
+    clearIdempotencyKey();
     resetBooking();
     router.replace('/');
   }

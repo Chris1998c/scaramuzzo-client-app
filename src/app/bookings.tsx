@@ -17,6 +17,7 @@ import { AppHeader } from '@/components/ui/AppHeader';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { getApiErrorMessage } from '@/lib/apiErrorMessage';
+import { customerBookingsQueryKey } from '@/lib/queryKeys';
 import { cancelBooking, fetchBookings } from '@/services/customerApi';
 import { GlassErrorBanner } from '@/components/ui/GlassErrorBanner';
 import { screenPadding } from '@/theme/glass';
@@ -28,7 +29,7 @@ import {
 } from '@/types/customerApi';
 import { colors } from '@/theme/colors';
 
-const BOOKINGS_QUERY_KEY = ['customer', 'bookings'] as const;
+const BOOKINGS_QUERY_KEY = customerBookingsQueryKey;
 
 function getBookingsErrorMessage(error: unknown): string {
   if (error instanceof CustomerApiError && error.status === 403) {

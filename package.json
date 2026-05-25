@@ -37,17 +37,19 @@
     "zustand": "^5.0.13"
   },
   "devDependencies": {
-    "@types/react": "~19.2.2",
+    "@types/react": "~19.1.10",
     "eslint": "^9.0.0",
-    "eslint-config-expo": "~56.0.4",
-    "typescript": "~6.0.3"
+    "eslint-config-expo": "~10.0.0",
+    "sharp": "^0.34.5",
+    "typescript": "~5.9.2"
   },
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "lint": "expo lint src"
+    "lint": "expo lint src",
+    "generate:assets": "node scripts/generate-app-assets.mjs"
   },
   "private": true
 }

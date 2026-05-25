@@ -1,11 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
 
 import { formatGreetingLabel } from '@/lib/formatDisplayName';
-import { profileLinkQueryKey } from '@/lib/queryKeys';
+import {
+  customerProfileNameQueryKey,
+  profileLinkQueryKey,
+} from '@/lib/queryKeys';
 import { fetchCustomerProfileName } from '@/services/customerProfile';
 import { useAuthStore } from '@/store/authStore';
-
-export const customerProfileNameQueryKey = ['customer', 'profile-name'] as const;
 
 export function useCustomerDisplayName() {
   const user = useAuthStore((state) => state.user);
