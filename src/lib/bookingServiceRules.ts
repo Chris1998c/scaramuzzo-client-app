@@ -1,30 +1,26 @@
 import type { CustomerService } from '@/types/customerApi';
 
-const TECHNICAL_CATEGORY_KEYWORDS = [
-  'colore',
-  'colorazione',
-  'erbe',
-  'botaniche',
-  'henne',
-  'henna',
-  'gloss',
-  'tonalizz',
-  'schiaritur',
-  'balayage',
-  'meches',
-  'mech',
-  'decolor',
-  'permanente',
-  'stiratura',
-  'keratina',
-  'trattamento tecnico',
-] as const;
+/**
+ * Regola piega allineata 1:1 al backend Manager
+ * (`lib/customer-app/customerBookingServiceRules.ts` + `lib/agendaServiceVisual.ts`).
+ *
+ * Backend: colore / schiariture / styling / trattamento (tecnico) / taglio (incluso
+ * taglio "generico", trattato come taglio donna) richiedono almeno una piega nello
+ * stesso booking. Taglio uomo / barber / barba e la piega stessa sono esclusi.
+ *
+ * La UI replica la classificazione per palette del backend così da non bloccare meno
+ * (o più) del backend. Il confirm gestisce comunque il 400 residuo come rete di sicurezza
+ * (es. `need_processing` non esposto dal DTO `/services`).
+ */
 
-const TECHNICAL_NAME_KEYWORDS = [...TECHNICAL_CATEGORY_KEYWORDS] as const;
-
-const BLOW_DRY_NAME_KEYWORDS = ['piega', 'blow dry', 'blowdry', 'asciugatura'] as const;
-
-const BLOW_DRY_CATEGORY_KEYWORDS = ['styling', 'finish', 'finishing', 'piega'] as const;
+export type AgendaPaletteKey =
+  | 'colorazione'
+  | 'taglio'
+  | 'trattamento'
+  | 'schiariture'
+  | 'styling'
+  | 'piega'
+  | 'default';
 
 export type BlowDryRequirementStatus = 'ok' | 'missing_blow_dry' | 'blow_dry_unavailable';
 
@@ -36,7 +32,7 @@ export type BlowDryRequirementState =
     }
   | { status: 'blow_dry_unavailable' };
 
-function normalizeSearchText(value: string | null | undefined): string {
+function norm(value: string | null | undefined): string {
   if (!value) {
     return '';
   }
@@ -48,76 +44,125 @@ function normalizeSearchText(value: string | null | undefined): string {
     .trim();
 }
 
-function containsKeyword(haystack: string, keyword: string): boolean {
-  return haystack.includes(keyword);
-}
-
-function matchesAnyKeyword(text: string, keywords: readonly string[]): boolean {
-  return keywords.some((keyword) => containsKeyword(text, keyword));
-}
-
-function isTaglioUomoService(service: CustomerService): boolean {
-  const name = normalizeSearchText(service.name);
-  const category = normalizeSearchText(service.category_name);
-
-  const hasTaglio = containsKeyword(name, 'taglio') || containsKeyword(category, 'taglio');
-  const hasUomo =
-    containsKeyword(name, 'uomo') ||
-    containsKeyword(name, 'barba') ||
-    containsKeyword(category, 'uomo') ||
-    containsKeyword(category, 'barba');
-
-  return hasTaglio && hasUomo;
-}
-
-/** Servizio piega / blow dry (finish obbligatorio per servizi tecnici). */
-export function isBlowDryService(service: CustomerService): boolean {
-  const name = normalizeSearchText(service.name);
-  const category = normalizeSearchText(service.category_name);
-
-  if (matchesAnyKeyword(name, BLOW_DRY_NAME_KEYWORDS)) {
-    return true;
-  }
-
-  if (matchesAnyKeyword(category, BLOW_DRY_CATEGORY_KEYWORDS) && containsKeyword(name, 'piega')) {
-    return true;
-  }
-
-  return containsKeyword(category, 'piega') && !containsKeyword(category, 'colore');
+/** `categoria | servizio` normalizzato, come `haystack()` lato backend. */
+function haystack(service: CustomerService): string {
+  const cat = norm(service.category_name);
+  const svc = norm(service.name);
+  return [cat, svc].filter(Boolean).join(' | ');
 }
 
 /**
- * Servizio tecnico/stilistico che richiede piega in aggiunta.
- * Escluso: piega stessa, taglio uomo.
+ * Port di `resolveAgendaPaletteKey` (Manager): nome categoria + nome servizio → chiave palette.
+ * Mantenere l'ordine e le regex identiche al backend.
+ */
+export function resolveAgendaPaletteKey(service: CustomerService): AgendaPaletteKey {
+  const cat = norm(service.category_name);
+  const svc = norm(service.name);
+  const hay = [cat, svc].filter(Boolean).join(' | ');
+
+  if (!hay) {
+    return 'default';
+  }
+
+  const order: { key: AgendaPaletteKey; re: RegExp }[] = [
+    {
+      key: 'colorazione',
+      re: /color|colour|tinta|tinto|colore|meches|meche|decolor|rifless|raccol|tonal|shampoo.?tinta|patch|henn/,
+    },
+    {
+      key: 'schiariture',
+      re: /schiar|bleach|balayage|ombr|airtouch|platin|chiar|carta|foli|highlights|schiuma|super.?blond/,
+    },
+    { key: 'taglio', re: /taglio|cut|scalp|barber|barba|punta|rasto|forbici/ },
+    {
+      key: 'trattamento',
+      re: /trattament|kerat|ricostr|rigen|nutri|ristrutt|repair|maschera|botox.?cap|ossigen|reconstruction|therapy/,
+    },
+    { key: 'piega', re: /piega|phono|phon|asciug|brush|ceppi|finish.?piega|blower/ },
+    {
+      key: 'styling',
+      re: /styling|style|moss|lisci|sleek|ondul|wavy|taylor|updo|raccolto.?cer|trecce|dread|crespo|curl|diffus/,
+    },
+  ];
+
+  for (const { key, re } of order) {
+    if (re.test(hay)) {
+      return key;
+    }
+  }
+
+  if (cat) {
+    if (/taglio|cut/.test(cat)) return 'taglio';
+    if (/trattament|kerat/.test(cat)) return 'trattamento';
+    if (/color|tinta/.test(cat)) return 'colorazione';
+    if (/styl|piega|finish/.test(cat)) return 'styling';
+    if (/schiar/.test(cat)) return 'schiariture';
+  }
+
+  return 'default';
+}
+
+/** Piega / asciugatura / phon (palette dedicata) — port di `isCustomerAppPiegaService`. */
+export function isBlowDryService(service: CustomerService): boolean {
+  return resolveAgendaPaletteKey(service) === 'piega';
+}
+
+/** Taglio uomo / barber / barba — escluso dalla regola piega (port di `isCustomerAppMensHaircutService`). */
+export function isMensHaircutService(service: CustomerService): boolean {
+  const hay = haystack(service);
+
+  if (/taglio\s*uomo|uomo\s*taglio|taglio\s*men|men\s*cut|barber|barbiere|barba\b/.test(hay)) {
+    return true;
+  }
+
+  if (resolveAgendaPaletteKey(service) === 'taglio' && /\buomo\b|\bmen\b|barber|barba\b/.test(hay)) {
+    return true;
+  }
+
+  return false;
+}
+
+/** Servizio tecnico (port di `isCustomerAppTechnicalService`). */
+function isTechnicalService(service: CustomerService): boolean {
+  if (service.need_processing === true) {
+    return true;
+  }
+
+  const hay = haystack(service);
+  if (/\btecnico\b|technical|preparaz|svern|mordenz|decap|applicaz/.test(hay)) {
+    return true;
+  }
+
+  return resolveAgendaPaletteKey(service) === 'trattamento';
+}
+
+const REQUIRES_PIEGA_PALETTE_KEYS: ReadonlySet<AgendaPaletteKey> = new Set([
+  'colorazione',
+  'schiariture',
+  'styling',
+]);
+
+/**
+ * Servizio che obbliga la presenza di una piega nello stesso booking.
+ * Port di `serviceRequiresPiegaCompanion`.
  */
 export function requiresBlowDry(service: CustomerService): boolean {
-  if (isBlowDryService(service)) {
+  if (isBlowDryService(service) || isMensHaircutService(service)) {
     return false;
   }
 
-  if (isTaglioUomoService(service)) {
-    return false;
-  }
+  const paletteKey = resolveAgendaPaletteKey(service);
 
-  const name = normalizeSearchText(service.name);
-  const category = normalizeSearchText(service.category_name);
-
-  if (matchesAnyKeyword(category, TECHNICAL_CATEGORY_KEYWORDS)) {
+  if (REQUIRES_PIEGA_PALETTE_KEYS.has(paletteKey)) {
     return true;
   }
 
-  if (matchesAnyKeyword(name, TECHNICAL_NAME_KEYWORDS)) {
+  // Taglio generico = taglio donna → richiede piega (allineato al backend).
+  if (paletteKey === 'taglio') {
     return true;
   }
 
-  const isTaglioDonna =
-    (containsKeyword(name, 'taglio') || containsKeyword(category, 'taglio')) &&
-    (containsKeyword(name, 'donna') ||
-      containsKeyword(name, 'donne') ||
-      containsKeyword(category, 'donna') ||
-      containsKeyword(category, 'donne'));
-
-  if (isTaglioDonna && !containsKeyword(name, 'uomo') && !containsKeyword(category, 'uomo')) {
+  if (isTechnicalService(service)) {
     return true;
   }
 
@@ -136,7 +181,7 @@ function isServiceSelected(
 }
 
 /**
- * Stato regola piega per il carrello corrente.
+ * Stato regola piega per il carrello corrente (port di `evaluateCustomerBookingPiegaRule`).
  */
 export function getBlowDryRequirementState(
   services: CustomerService[],
@@ -144,8 +189,8 @@ export function getBlowDryRequirementState(
 ): BlowDryRequirementState {
   const selected = services.filter((service) => isServiceSelected(service, selectedServiceIds));
 
-  const requiresTechnical = selected.some(requiresBlowDry);
-  if (!requiresTechnical) {
+  const needsPiega = selected.some(requiresBlowDry);
+  if (!needsPiega) {
     return { status: 'ok' };
   }
 
@@ -173,4 +218,20 @@ export function canContinueBooking(
   }
 
   return getBlowDryRequirementState(services, selectedServiceIds).status === 'ok';
+}
+
+/** Messaggio backend (400) quando manca la piega obbligatoria. */
+export const PIEGA_REQUIRED_BACKEND_MESSAGE =
+  'Per completare questa prenotazione aggiungi anche una piega.';
+
+/** Vero se l'errore API è la regola piega obbligatoria del backend. */
+export function isPiegaRequiredBackendMessage(message: string | null | undefined): boolean {
+  if (!message) {
+    return false;
+  }
+  const normalized = message.trim().toLowerCase();
+  return (
+    normalized === PIEGA_REQUIRED_BACKEND_MESSAGE.toLowerCase() ||
+    (normalized.includes('aggiungi') && normalized.includes('piega'))
+  );
 }

@@ -16,6 +16,7 @@ import { AppHeader } from '@/components/ui/AppHeader';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { getApiErrorMessage } from '@/lib/apiErrorMessage';
+import { isPiegaRequiredBackendMessage } from '@/lib/bookingServiceRules';
 import { buildBookingPayloadFingerprint } from '@/lib/bookingIdempotency';
 import { createBooking, fetchServices, generateIdempotencyKey } from '@/services/customerApi';
 import { GlassErrorBanner } from '@/components/ui/GlassErrorBanner';
@@ -24,8 +25,14 @@ import { useBookingStore } from '@/store/bookingStore';
 import { CustomerApiError } from '@/types/customerApi';
 import { colors } from '@/theme/colors';
 
+const PIEGA_REQUIRED_UI_MESSAGE = 'Per confermare devi aggiungere anche una piega.';
+
 function getSubmitErrorMessage(error: unknown): string {
   if (error instanceof CustomerApiError) {
+    if (error.status === 400 && isPiegaRequiredBackendMessage(error.message)) {
+      return PIEGA_REQUIRED_UI_MESSAGE;
+    }
+
     if (error.status === 409) {
       return 'Questo orario non è più disponibile. Torna agli orari e scegline un altro.';
     }
@@ -338,6 +345,13 @@ export default function BookConfirmScreen() {
                 style={({ pressed }) => [styles.linkButton, pressed && styles.buttonPressed]}
                 onPress={() => router.push('/claim')}>
                 <Text style={styles.linkButtonText}>Collega profilo</Text>
+              </Pressable>
+            ) : null}
+            {submitError === PIEGA_REQUIRED_UI_MESSAGE ? (
+              <Pressable
+                style={({ pressed }) => [styles.linkButton, pressed && styles.buttonPressed]}
+                onPress={() => router.replace('/book')}>
+                <Text style={styles.linkButtonText}>Torna ai servizi</Text>
               </Pressable>
             ) : null}
           </View>

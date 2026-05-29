@@ -28,6 +28,11 @@ export type CustomerService = {
   duration: number;
   price: number;
   color_code?: string | null;
+  /**
+   * Flag servizio tecnico lato anagrafica Manager. Non incluso nel DTO `/services`
+   * attuale, ma supportato in modo forward-compatible per allineare la regola piega.
+   */
+  need_processing?: boolean | null;
 };
 
 export type ServicesResponse = { services: CustomerService[] };
