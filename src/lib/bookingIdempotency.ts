@@ -6,7 +6,8 @@ export function buildBookingPayloadFingerprint(params: {
   startTime: string | undefined;
   notes: string;
 }): string {
-  const serviceIds = [...params.serviceIds].map((id) => String(id)).sort();
+  // Ordine service_ids allineato al Manager (hash server order-sensitive).
+  const serviceIds = [...params.serviceIds].map((id) => String(id));
 
   return JSON.stringify({
     salon_id: String(params.salonId ?? ''),
