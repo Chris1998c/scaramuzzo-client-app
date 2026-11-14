@@ -17,8 +17,11 @@ service role key in una app pubblica.
 La PWA statica è pubblicata dal Manager su
 `https://manager.scaramuzzo.green/app-clienti`. In Safari: Condividi →
 **Aggiungi alla schermata Home**. L'app usa lo stesso login Supabase e le stesse
-API di prenotazione della versione Expo Go. Non è presente un servizio di push:
-promemoria push richiedono un'implementazione separata.
+API di prenotazione della versione Expo Go. Dal profilo collegato, il cliente
+può attivare i promemoria push circa 24 ore prima dell'appuntamento. Su iPhone
+il permesso va richiesto dall'app aperta tramite l'icona Home. Ogni dispositivo
+si abilita separatamente; logout e disattivazione eliminano la sottoscrizione
+locale. Il canale WhatsApp resta indipendente.
 
 Per aggiornare la versione web, con `scaramuzzo-client-app` e
 `scaramuzzo-manager` affiancati:

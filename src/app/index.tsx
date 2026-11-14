@@ -1,11 +1,12 @@
 import { router } from 'expo-router';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppHeader } from '@/components/ui/AppHeader';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { GlassErrorBanner } from '@/components/ui/GlassErrorBanner';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
+import { PushReminderCard } from '@/components/PushReminderCard';
 import { useProfileLinkStatus } from '@/hooks/useProfileLinkStatus';
 import { getApiErrorMessage } from '@/lib/apiErrorMessage';
 import { useCustomerDisplayName } from '@/hooks/useCustomerDisplayName';
@@ -93,6 +94,8 @@ export default function HomeScreen() {
                 onPress={() => router.push('/bookings')}
               />
             </GlassCard>
+
+            {Platform.OS === 'web' ? <PushReminderCard /> : null}
 
             {(salons ?? []).length > 0 ? (
               <GlassCard contentStyle={styles.salonsCard}>
