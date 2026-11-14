@@ -168,11 +168,44 @@ export async function fetchSalons(): Promise<CustomerSalon[]> {
   return parseSalonsResponse(data);
 }
 
-export async function fetchServices(salonId: string | number): Promise<CustomerService[]> {
+export type CustomerServicesCatalog = {
+  /** Voci selezionabili in UI. */
+  services: CustomerService[];
+  /** Companion non selezionabili (es. Shampoo) per composizione/riepilogo. */
+  companions: CustomerService[];
+  /** Unione per compose/prezzo/durata (services + companions, senza doppioni). */
+  compositionCatalog: CustomerService[];
+};
+
+export async function fetchServicesCatalog(
+  salonId: string | number,
+): Promise<CustomerServicesCatalog> {
   const data = await customerFetch<ServicesResponse>(
     `/api/customer/v1/services?salon_id=${encodeURIComponent(String(salonId))}`,
   );
-  return data.services ?? [];
+  const services = (data.services ?? []).map((service) => ({
+    ...service,
+    selectable: service.selectable !== false,
+  }));
+  const companions = (data.companions ?? []).map((service) => ({
+    ...service,
+    selectable: false,
+  }));
+  const byId = new Map<string, CustomerService>();
+  for (const service of [...services, ...companions]) {
+    byId.set(String(service.id), service);
+  }
+  return {
+    services,
+    companions,
+    compositionCatalog: [...byId.values()],
+  };
+}
+
+/** Catalogo selezione UI (senza companion). Preferire fetchServicesCatalog nel flusso booking. */
+export async function fetchServices(salonId: string | number): Promise<CustomerService[]> {
+  const catalog = await fetchServicesCatalog(salonId);
+  return catalog.services;
 }
 
 export async function fetchStaff(

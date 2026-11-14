@@ -336,7 +336,9 @@ export default function BookingsScreen() {
         refreshControl={
           <RefreshControl
             refreshing={isRefetching}
-            onRefresh={() => refetch()}
+            onRefresh={() => {
+              void refetch();
+            }}
             tintColor={colors.gold}
           />
         }>

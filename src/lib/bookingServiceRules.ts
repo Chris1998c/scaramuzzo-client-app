@@ -1,16 +1,14 @@
 import type { CustomerService } from '@/types/customerApi';
 
 /**
- * Regola piega allineata 1:1 al backend Manager
+ * Regole booking allineate al backend Manager
  * (`lib/customer-app/customerBookingServiceRules.ts` + `lib/agendaServiceVisual.ts`).
  *
- * Backend: colore / schiariture / styling / trattamento (tecnico) / taglio (incluso
- * taglio "generico", trattato come taglio donna) richiedono almeno una piega nello
- * stesso booking. Taglio uomo / barber / barba e la piega stessa sono esclusi.
- *
- * La UI replica la classificazione per palette del backend così da non bloccare meno
- * (o più) del backend. Il confirm gestisce comunque il 400 residuo come rete di sicurezza
- * (es. `need_processing` non esposto dal DTO `/services`).
+ * 1) Piega obbligatoria: colore / schiariture / styling / trattamento (tecnico) /
+ *    taglio donna richiedono almeno una piega. Taglio uomo / barber / barba esclusi.
+ * 2) Composizione companion: per taglio donna / colore / schiariture / tecnico / erbe
+ *    si assicurano shampoo + piega (senza duplicare se già scelti), ordine
+ *    shampoo → servizi → piega.
  */
 
 export type AgendaPaletteKey =
@@ -31,6 +29,17 @@ export type BlowDryRequirementState =
       blowDryService: CustomerService;
     }
   | { status: 'blow_dry_unavailable' };
+
+export type CompanionRequirementState =
+  | { status: 'ok' }
+  | {
+      status: 'missing_companions';
+      missingShampoo: boolean;
+      missingPiega: boolean;
+      shampooService: CustomerService | null;
+      blowDryService: CustomerService | null;
+    }
+  | { status: 'companions_unavailable'; missingShampoo: boolean; missingPiega: boolean };
 
 function norm(value: string | null | undefined): string {
   if (!value) {
@@ -107,6 +116,15 @@ export function isBlowDryService(service: CustomerService): boolean {
   return resolveAgendaPaletteKey(service) === 'piega';
 }
 
+/** Shampoo / lavaggio (non shampoo-tinta). */
+export function isShampooService(service: CustomerService): boolean {
+  const hay = haystack(service);
+  if (/shampoo\s*tinta|tinta\s*shampoo/.test(hay)) {
+    return false;
+  }
+  return /shampoo|lavaggio|(^|[^a-z])wash([^a-z]|$)/.test(hay);
+}
+
 /** Taglio uomo / barber / barba — escluso dalla regola piega (port di `isCustomerAppMensHaircutService`). */
 export function isMensHaircutService(service: CustomerService): boolean {
   const hay = haystack(service);
@@ -169,8 +187,29 @@ export function requiresBlowDry(service: CustomerService): boolean {
   return false;
 }
 
-function findBlowDryServices(services: CustomerService[]): CustomerService[] {
-  return services.filter(isBlowDryService);
+/**
+ * Taglio donna / colore / schiariture / tecnico / erbe → richiedono shampoo.
+ * Port di `serviceRequiresShampooCompanion`.
+ */
+export function requiresShampooCompanion(service: CustomerService): boolean {
+  if (isShampooService(service) || isBlowDryService(service) || isMensHaircutService(service)) {
+    return false;
+  }
+
+  const paletteKey = resolveAgendaPaletteKey(service);
+  if (paletteKey === 'colorazione' || paletteKey === 'schiariture' || paletteKey === 'taglio') {
+    return true;
+  }
+
+  if (isTechnicalService(service)) {
+    return true;
+  }
+
+  if (/erbe|botanic|henn/.test(haystack(service))) {
+    return true;
+  }
+
+  return false;
 }
 
 function isServiceSelected(
@@ -178,6 +217,77 @@ function isServiceSelected(
   selectedServiceIds: (string | number)[],
 ): boolean {
   return selectedServiceIds.some((id) => String(id) === String(service.id));
+}
+
+function findBlowDryServices(services: CustomerService[]): CustomerService[] {
+  return services.filter(isBlowDryService);
+}
+
+function findShampooServices(services: CustomerService[]): CustomerService[] {
+  return services.filter(isShampooService);
+}
+
+/**
+ * Ordine canonico: shampoo → servizi principali → piega.
+ */
+export function orderBookingServiceIds(
+  services: CustomerService[],
+  selectedServiceIds: (string | number)[],
+): (string | number)[] {
+  const byId = new Map(services.map((service) => [String(service.id), service]));
+  const shampoo: (string | number)[] = [];
+  const middle: (string | number)[] = [];
+  const piega: (string | number)[] = [];
+  const seen = new Set<string>();
+
+  for (const id of selectedServiceIds) {
+    const key = String(id);
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    const service = byId.get(key);
+    if (service && isShampooService(service)) {
+      shampoo.push(id);
+    } else if (service && isBlowDryService(service)) {
+      piega.push(id);
+    } else {
+      middle.push(id);
+    }
+  }
+
+  return [...shampoo, ...middle, ...piega];
+}
+
+/**
+ * Compone il carrello con shampoo/piega obbligatori senza duplicarli.
+ * Port di `composeCustomerBookingServiceIds`.
+ */
+export function composeBookingServiceIds(
+  services: CustomerService[],
+  selectedServiceIds: (string | number)[],
+): (string | number)[] {
+  const selected = services.filter((service) => isServiceSelected(service, selectedServiceIds));
+  const needsPiega = selected.some(requiresBlowDry);
+  const needsShampoo = selected.some(requiresShampooCompanion);
+
+  let next = [...selectedServiceIds];
+
+  if (needsShampoo && !selected.some(isShampooService)) {
+    const shampoo = findShampooServices(services)[0];
+    if (shampoo) {
+      next = [shampoo.id, ...next.filter((id) => String(id) !== String(shampoo.id))];
+    }
+  }
+
+  if (needsPiega && !selected.some(isBlowDryService)) {
+    const piega = findBlowDryServices(services)[0];
+    if (piega) {
+      next = [...next.filter((id) => String(id) !== String(piega.id)), piega.id];
+    }
+  }
+
+  return orderBookingServiceIds(services, next);
 }
 
 /**
@@ -209,6 +319,45 @@ export function getBlowDryRequirementState(
   };
 }
 
+/** Stato companion (shampoo + piega) dopo eventuale composizione. */
+export function getCompanionRequirementState(
+  services: CustomerService[],
+  selectedServiceIds: (string | number)[],
+): CompanionRequirementState {
+  const selected = services.filter((service) => isServiceSelected(service, selectedServiceIds));
+  const needsPiega = selected.some(requiresBlowDry);
+  const needsShampoo = selected.some(requiresShampooCompanion);
+
+  const hasPiega = selected.some(isBlowDryService);
+  const hasShampoo = selected.some(isShampooService);
+
+  const missingPiega = needsPiega && !hasPiega;
+  const missingShampoo = needsShampoo && !hasShampoo;
+
+  if (!missingPiega && !missingShampoo) {
+    return { status: 'ok' };
+  }
+
+  const shampooService = findShampooServices(services)[0] ?? null;
+  const blowDryService = findBlowDryServices(services)[0] ?? null;
+
+  if ((missingShampoo && !shampooService) || (missingPiega && !blowDryService)) {
+    return {
+      status: 'companions_unavailable',
+      missingShampoo,
+      missingPiega,
+    };
+  }
+
+  return {
+    status: 'missing_companions',
+    missingShampoo,
+    missingPiega,
+    shampooService,
+    blowDryService,
+  };
+}
+
 export function canContinueBooking(
   services: CustomerService[],
   selectedServiceIds: (string | number)[],
@@ -217,7 +366,16 @@ export function canContinueBooking(
     return false;
   }
 
-  return getBlowDryRequirementState(services, selectedServiceIds).status === 'ok';
+  return getCompanionRequirementState(services, selectedServiceIds).status === 'ok';
+}
+
+/** Durata effettiva riga (DTO Manager già espone duration = snapshot Agenda). */
+export function effectiveServiceDurationMinutes(service: CustomerService): number {
+  const duration = Number(service.duration);
+  if (!Number.isFinite(duration) || duration <= 0) {
+    return 0;
+  }
+  return Math.trunc(duration);
 }
 
 /** Messaggio backend (400) quando manca la piega obbligatoria. */

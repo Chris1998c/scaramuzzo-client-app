@@ -16,9 +16,17 @@ import { AppHeader } from '@/components/ui/AppHeader';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { getApiErrorMessage } from '@/lib/apiErrorMessage';
-import { isPiegaRequiredBackendMessage } from '@/lib/bookingServiceRules';
+import {
+  composeBookingServiceIds,
+  effectiveServiceDurationMinutes,
+  isPiegaRequiredBackendMessage,
+} from '@/lib/bookingServiceRules';
 import { buildBookingPayloadFingerprint } from '@/lib/bookingIdempotency';
-import { createBooking, fetchServices, generateIdempotencyKey } from '@/services/customerApi';
+import {
+  createBooking,
+  fetchServicesCatalog,
+  generateIdempotencyKey,
+} from '@/services/customerApi';
 import { GlassErrorBanner } from '@/components/ui/GlassErrorBanner';
 import { inputStyle, screenPadding } from '@/theme/glass';
 import { useBookingStore } from '@/store/bookingStore';
@@ -87,6 +95,7 @@ export default function BookConfirmScreen() {
   const notes = useBookingStore((state) => state.notes);
   const lastCreatedBooking = useBookingStore((state) => state.lastCreatedBooking);
   const setNotes = useBookingStore((state) => state.setNotes);
+  const setSelectedServiceIds = useBookingStore((state) => state.setSelectedServiceIds);
   const setLastCreatedBooking = useBookingStore((state) => state.setLastCreatedBooking);
   const resetBooking = useBookingStore((state) => state.resetBooking);
 
@@ -98,18 +107,41 @@ export default function BookConfirmScreen() {
 
   const isBookingComplete = Boolean(lastCreatedBooking);
 
+  const { data: servicesCatalog } = useQuery({
+    queryKey: ['customer', 'services', selectedSalonId],
+    queryFn: () => fetchServicesCatalog(selectedSalonId!),
+    enabled: selectedSalonId !== null && !isBookingComplete,
+  });
+
+  const compositionCatalog = useMemo(
+    () => servicesCatalog?.compositionCatalog ?? [],
+    [servicesCatalog?.compositionCatalog],
+  );
+  const selectableIdSet = useMemo(
+    () => new Set((servicesCatalog?.services ?? []).map((service) => String(service.id))),
+    [servicesCatalog?.services],
+  );
+
+  const composedServiceIds = useMemo(() => {
+    if (!compositionCatalog.length) {
+      return selectedServiceIds;
+    }
+    const seed = selectedServiceIds.filter((id) => selectableIdSet.has(String(id)));
+    return composeBookingServiceIds(compositionCatalog, seed);
+  }, [compositionCatalog, selectedServiceIds, selectableIdSet]);
+
   const bookingPayloadFingerprint = useMemo(
     () =>
       buildBookingPayloadFingerprint({
         salonId: selectedSalonId,
-        serviceIds: selectedServiceIds,
+        serviceIds: composedServiceIds,
         staffId: selectedStaffId,
         startTime: selectedSlot?.start_time,
         notes,
       }),
     [
       selectedSalonId,
-      selectedServiceIds,
+      composedServiceIds,
       selectedStaffId,
       selectedSlot?.start_time,
       notes,
@@ -169,23 +201,23 @@ export default function BookConfirmScreen() {
     selectedSlot,
   ]);
 
-  const { data: services } = useQuery({
-    queryKey: ['customer', 'services', selectedSalonId],
-    queryFn: () => fetchServices(selectedSalonId!),
-    enabled: selectedSalonId !== null && !isBookingComplete,
-  });
-
   const selectedServices = useMemo(() => {
-    if (!services?.length) {
+    if (!compositionCatalog.length) {
       return [];
     }
 
-    return services.filter((service) =>
-      selectedServiceIds.some((id) => String(id) === String(service.id)),
+    const byId = new Map(
+      compositionCatalog.map((service) => [String(service.id), service]),
     );
-  }, [services, selectedServiceIds]);
+    return composedServiceIds
+      .map((id) => byId.get(String(id)))
+      .filter((service): service is NonNullable<typeof service> => Boolean(service));
+  }, [compositionCatalog, composedServiceIds]);
 
-  const totalDuration = selectedServices.reduce((sum, service) => sum + service.duration, 0);
+  const totalDuration = selectedServices.reduce(
+    (sum, service) => sum + effectiveServiceDurationMinutes(service),
+    0,
+  );
   const totalPrice = selectedServices.reduce((sum, service) => sum + service.price, 0);
 
   async function handleConfirm() {
@@ -193,12 +225,16 @@ export default function BookConfirmScreen() {
       return;
     }
 
-    if (!selectedSalonId || !selectedStaffId || !selectedSlot || selectedServiceIds.length === 0) {
+    if (!selectedSalonId || !selectedStaffId || !selectedSlot || composedServiceIds.length === 0) {
       return;
     }
 
     setIsSubmitting(true);
     setSubmitError(null);
+
+    if (compositionCatalog.length) {
+      setSelectedServiceIds(composedServiceIds);
+    }
 
     const idempotencyKey = getSubmitIdempotencyKey();
 
@@ -206,7 +242,7 @@ export default function BookConfirmScreen() {
       const booking = await createBooking(
         {
           salon_id: Number(selectedSalonId),
-          service_ids: selectedServiceIds.map((id) => Number(id)),
+          service_ids: composedServiceIds.map((id) => Number(id)),
           staff_id: Number(selectedStaffId),
           start_time: selectedSlot.start_time,
           notes: notes.trim() || undefined,
@@ -282,7 +318,8 @@ export default function BookConfirmScreen() {
             <View key={service.id} style={styles.serviceRow}>
               <Text style={styles.serviceName}>{service.name}</Text>
               <Text style={styles.serviceMeta}>
-                {formatDuration(service.duration)} · {formatPrice(service.price)}
+                {formatDuration(effectiveServiceDurationMinutes(service))} ·{' '}
+                {formatPrice(service.price)}
               </Text>
             </View>
           ))}

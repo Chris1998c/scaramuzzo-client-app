@@ -128,7 +128,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   frostLayer: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(197, 165, 114, 0.04)',
   },
   loadingContainer: {

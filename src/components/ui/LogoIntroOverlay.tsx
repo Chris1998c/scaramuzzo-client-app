@@ -80,7 +80,7 @@ export function LogoIntroOverlay({ onComplete }: LogoIntroOverlayProps) {
 
 const styles = StyleSheet.create({
   overlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: colors.background,
     alignItems: 'center',
     justifyContent: 'center',

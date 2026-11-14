@@ -13,6 +13,7 @@ type BookingState = {
   lastCreatedBooking: CustomerBooking | null;
   setSalon: (id: string | number, name: string) => void;
   toggleService: (id: string | number) => void;
+  setSelectedServiceIds: (ids: (string | number)[]) => void;
   clearServices: () => void;
   setStaff: (id: string | number, name: string) => void;
   setDate: (date: string) => void;
@@ -68,6 +69,11 @@ export const useBookingStore = create<BookingState>((set, get) => ({
       selectedSlot: null,
     });
   },
+  setSelectedServiceIds: (ids) =>
+    set({
+      selectedServiceIds: ids,
+      selectedSlot: null,
+    }),
   clearServices: () =>
     set({
       selectedServiceIds: [],

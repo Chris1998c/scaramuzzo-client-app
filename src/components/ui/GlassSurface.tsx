@@ -71,11 +71,11 @@ const styles = StyleSheet.create({
     borderColor: glass.borderGlow,
   },
   tint: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: glass.panel,
   },
   depth: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: glass.panelDeep,
   },
   highlightTop: {

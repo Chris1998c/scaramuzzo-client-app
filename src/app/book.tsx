@@ -18,9 +18,11 @@ import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { getApiErrorMessage } from '@/lib/apiErrorMessage';
 import {
   canContinueBooking,
-  getBlowDryRequirementState,
+  composeBookingServiceIds,
+  effectiveServiceDurationMinutes,
+  getCompanionRequirementState,
 } from '@/lib/bookingServiceRules';
-import { fetchSalons, fetchServices } from '@/services/customerApi';
+import { fetchSalons, fetchServicesCatalog } from '@/services/customerApi';
 import { screenPadding } from '@/theme/glass';
 import { useAuthStore } from '@/store/authStore';
 import { useBookingStore } from '@/store/bookingStore';
@@ -63,7 +65,7 @@ export default function BookScreen() {
   const selectedSalonId = useBookingStore((state) => state.selectedSalonId);
   const selectedServiceIds = useBookingStore((state) => state.selectedServiceIds);
   const setSalon = useBookingStore((state) => state.setSalon);
-  const toggleService = useBookingStore((state) => state.toggleService);
+  const setSelectedServiceIds = useBookingStore((state) => state.setSelectedServiceIds);
 
   const {
     data: salons,
@@ -76,55 +78,96 @@ export default function BookScreen() {
   });
 
   const {
-    data: services,
+    data: servicesCatalog,
     error: servicesError,
     isLoading: isServicesLoading,
   } = useQuery({
     queryKey: ['customer', 'services', selectedSalonId],
-    queryFn: () => fetchServices(selectedSalonId!),
+    queryFn: () => fetchServicesCatalog(selectedSalonId!),
     enabled: selectedSalonId !== null,
   });
 
+  const selectableServices = useMemo(
+    () => servicesCatalog?.services ?? [],
+    [servicesCatalog?.services],
+  );
+  const compositionCatalog = useMemo(
+    () => servicesCatalog?.compositionCatalog ?? [],
+    [servicesCatalog?.compositionCatalog],
+  );
+
   const selectedServices = useMemo(() => {
-    if (!services?.length) {
+    if (!compositionCatalog.length) {
       return [];
     }
 
-    return services.filter((service) =>
-      selectedServiceIds.some((id) => String(id) === String(service.id)),
+    const byId = new Map(
+      compositionCatalog.map((service) => [String(service.id), service]),
     );
-  }, [services, selectedServiceIds]);
+    return selectedServiceIds
+      .map((id) => byId.get(String(id)))
+      .filter((service): service is NonNullable<typeof service> => Boolean(service));
+  }, [compositionCatalog, selectedServiceIds]);
 
-  const totalDuration = selectedServices.reduce((sum, service) => sum + service.duration, 0);
+  const totalDuration = selectedServices.reduce(
+    (sum, service) => sum + effectiveServiceDurationMinutes(service),
+    0,
+  );
   const totalPrice = selectedServices.reduce((sum, service) => sum + service.price, 0);
   const hasSelectedServices = selectedServiceIds.length > 0;
 
-  const blowDryState = useMemo(
-    () => getBlowDryRequirementState(services ?? [], selectedServiceIds),
-    [services, selectedServiceIds],
+  const companionState = useMemo(
+    () => getCompanionRequirementState(compositionCatalog, selectedServiceIds),
+    [compositionCatalog, selectedServiceIds],
   );
 
-  const canContinue = canContinueBooking(services ?? [], selectedServiceIds);
+  const canContinue = canContinueBooking(compositionCatalog, selectedServiceIds);
+
+  function selectableSeedIds(ids: (string | number)[]): (string | number)[] {
+    const selectable = new Set(
+      selectableServices.map((service) => String(service.id)),
+    );
+    return ids.filter((id) => selectable.has(String(id)));
+  }
+
+  function handleToggleService(serviceId: string | number) {
+    const isSelected = selectedServiceIds.some((id) => String(id) === String(serviceId));
+    const nextIds = isSelected
+      ? selectedServiceIds.filter((id) => String(id) !== String(serviceId))
+      : [...selectedServiceIds, serviceId];
+    setSelectedServiceIds(
+      composeBookingServiceIds(compositionCatalog, selectableSeedIds(nextIds)),
+    );
+  }
 
   function handleContinue() {
     if (!canContinue) {
       return;
     }
 
+    if (compositionCatalog.length) {
+      setSelectedServiceIds(
+        composeBookingServiceIds(
+          compositionCatalog,
+          selectableSeedIds(selectedServiceIds),
+        ),
+      );
+    }
+
     router.push('/book-step-2');
   }
 
-  function handleAddBlowDry() {
-    if (blowDryState.status !== 'missing_blow_dry') {
+  function handleAddCompanions() {
+    if (companionState.status !== 'missing_companions') {
       return;
     }
 
-    const piegaId = blowDryState.blowDryService.id;
-    const alreadySelected = selectedServiceIds.some((id) => String(id) === String(piegaId));
-
-    if (!alreadySelected) {
-      toggleService(piegaId);
-    }
+    setSelectedServiceIds(
+      composeBookingServiceIds(
+        compositionCatalog,
+        selectableSeedIds(selectedServiceIds),
+      ),
+    );
   }
 
   if (isAuthLoading) {
@@ -228,7 +271,7 @@ export default function BookScreen() {
               </View>
             ) : null}
 
-            {!isServicesLoading && !servicesError && services?.length === 0 ? (
+            {!isServicesLoading && !servicesError && selectableServices.length === 0 ? (
               <View style={styles.emptyCard}>
                 <Text style={styles.emptyText}>
                   Nessun servizio disponibile per questo salone.
@@ -236,7 +279,7 @@ export default function BookScreen() {
               </View>
             ) : null}
 
-            {services?.map((service) => {
+            {selectableServices.map((service) => {
               const isSelected = selectedServiceIds.some(
                 (id) => String(id) === String(service.id),
               );
@@ -249,7 +292,7 @@ export default function BookScreen() {
                     isSelected && styles.serviceCardSelected,
                     pressed && styles.buttonPressed,
                   ]}
-                  onPress={() => toggleService(service.id)}>
+                  onPress={() => handleToggleService(service.id)}>
                   <View style={styles.serviceHeader}>
                     <Text style={[styles.serviceName, isSelected && styles.serviceNameSelected]}>
                       {service.name}
@@ -260,7 +303,9 @@ export default function BookScreen() {
                     <Text style={styles.serviceCategory}>{service.category_name}</Text>
                   ) : null}
                   <View style={styles.serviceMeta}>
-                    <Text style={styles.serviceMetaText}>{formatDuration(service.duration)}</Text>
+                    <Text style={styles.serviceMetaText}>
+                      {formatDuration(effectiveServiceDurationMinutes(service))}
+                    </Text>
                     <Text style={styles.servicePrice}>{formatPrice(service.price)}</Text>
                   </View>
                 </Pressable>
@@ -283,22 +328,32 @@ export default function BookScreen() {
           </View>
         ) : null}
 
-        {blowDryState.status === 'missing_blow_dry' ? (
+        {companionState.status === 'missing_companions' ? (
           <GlassCard contentStyle={styles.ruleCard}>
-            <Text style={styles.ruleTitle}>Piega consigliata</Text>
+            <Text style={styles.ruleTitle}>Servizi di completamento</Text>
             <Text style={styles.ruleText}>
-              Per completare questo servizio è necessario aggiungere anche la piega.
+              Per questo servizio aggiungiamo automaticamente
+              {companionState.missingShampoo && companionState.missingPiega
+                ? ' shampoo e piega'
+                : companionState.missingShampoo
+                  ? ' lo shampoo'
+                  : ' la piega'}
+              .
             </Text>
-            <PrimaryButton label="Aggiungi piega" onPress={handleAddBlowDry} />
+            <PrimaryButton label="Completa servizi" onPress={handleAddCompanions} />
           </GlassCard>
         ) : null}
 
-        {blowDryState.status === 'blow_dry_unavailable' ? (
+        {companionState.status === 'companions_unavailable' ? (
           <GlassCard contentStyle={styles.ruleCard}>
-            <Text style={styles.ruleTitle}>Piega non disponibile online</Text>
+            <Text style={styles.ruleTitle}>Completamento non disponibile online</Text>
             <Text style={styles.ruleText}>
-              La piega non risulta disponibile online. Contatta il salone per completare la
-              prenotazione.
+              {companionState.missingShampoo && companionState.missingPiega
+                ? 'Shampoo e piega non risultano prenotabili online.'
+                : companionState.missingShampoo
+                  ? 'Lo shampoo non risulta prenotabile online.'
+                  : 'La piega non risulta prenotabile online.'}{' '}
+              Contatta il salone per completare la prenotazione.
             </Text>
           </GlassCard>
         ) : null}

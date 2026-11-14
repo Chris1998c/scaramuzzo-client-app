@@ -25,17 +25,25 @@ export type CustomerService = {
   name: string;
   category_id: number | null;
   category_name: string | null;
+  /** Durata effettiva booking (Manager: snapshot Agenda max(duration, A+P)). */
   duration: number;
+  duration_active?: number | null;
+  duration_processing?: number | null;
   price: number;
   color_code?: string | null;
-  /**
-   * Flag servizio tecnico lato anagrafica Manager. Non incluso nel DTO `/services`
-   * attuale, ma supportato in modo forward-compatible per allineare la regola piega.
-   */
+  /** Flag servizio tecnico lato anagrafica Manager. */
   need_processing?: boolean | null;
+  /**
+   * false = companion di composizione (es. Shampoo), non selezionabile da solo.
+   * true/undefined = voce catalogo selezionabile.
+   */
+  selectable?: boolean | null;
 };
 
-export type ServicesResponse = { services: CustomerService[] };
+export type ServicesResponse = {
+  services: CustomerService[];
+  companions?: CustomerService[];
+};
 
 export type CustomerStaff = {
   id: number;
