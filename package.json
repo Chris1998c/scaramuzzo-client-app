@@ -54,7 +54,10 @@
     "lint": "expo lint src",
     "generate:assets": "node scripts/generate-app-assets.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test 'src/lib/__tests__/**/*.test.ts'"
+    "test": "node --import tsx --test 'src/lib/__tests__/**/*.test.ts'",
+    "export:web": "expo export -p web",
+    "sync:web:manager": "node scripts/sync-web-to-manager.mjs",
+    "build:web:manager": "npm run export:web && npm run sync:web:manager"
   },
   "private": true
 }
