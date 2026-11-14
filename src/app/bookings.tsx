@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -224,6 +225,7 @@ export default function BookingsScreen() {
   const isAuthLoading = useAuthStore((state) => state.isLoading);
   const [activeTab, setActiveTab] = useState<BookingTab>('upcoming');
   const [cancellingId, setCancellingId] = useState<number | null>(null);
+  const [cancelErrorMessage, setCancelErrorMessage] = useState('');
   const queryClient = useQueryClient();
 
   const {
@@ -274,25 +276,35 @@ export default function BookingsScreen() {
     { key: 'cancelled', label: 'Annullate', count: grouped.cancelled.length },
   ];
 
+  async function confirmCancellation(bookingId: number) {
+    setCancelErrorMessage('');
+    setCancellingId(bookingId);
+    try {
+      await cancelMutation.mutateAsync(bookingId);
+    } catch (cancelError) {
+      const message = getBookingsErrorMessage(cancelError);
+      if (Platform.OS === 'web') setCancelErrorMessage(message);
+      else Alert.alert('Impossibile annullare', message);
+    } finally {
+      setCancellingId(null);
+    }
+  }
+
   function handleCancelPress(booking: CustomerBookingListItem) {
+    const message = `Vuoi annullare l'appuntamento del ${formatDate(booking.start_time)}?`;
+    if (Platform.OS === 'web') {
+      if (window.confirm(message)) void confirmCancellation(booking.id);
+      return;
+    }
     Alert.alert(
       'Annulla prenotazione',
-      `Vuoi annullare l'appuntamento del ${formatDate(booking.start_time)}?`,
+      message,
       [
         { text: 'No', style: 'cancel' },
         {
           text: 'Annulla prenotazione',
           style: 'destructive',
-          onPress: async () => {
-            setCancellingId(booking.id);
-            try {
-              await cancelMutation.mutateAsync(booking.id);
-            } catch (cancelError) {
-              Alert.alert('Impossibile annullare', getBookingsErrorMessage(cancelError));
-            } finally {
-              setCancellingId(null);
-            }
-          },
+          onPress: () => void confirmCancellation(booking.id),
         },
       ],
     );
@@ -342,6 +354,8 @@ export default function BookingsScreen() {
             tintColor={colors.gold}
           />
         }>
+
+        {cancelErrorMessage ? <GlassErrorBanner message={cancelErrorMessage} /> : null}
 
         <View style={styles.tabRow}>
           {tabs.map((tab) => {
